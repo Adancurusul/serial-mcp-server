@@ -68,8 +68,12 @@ async fn main() -> Result<()> {
           config.serial.default_baud_rate, 
           config.serial.max_buffer_size);
 
+    // Create handler and get reference to connection manager for cleanup
+    let handler = SerialHandler::new(config.clone());
+    let connection_manager = handler.connection_manager();
+
     // Create and serve the handler using rust-sdk standard pattern
-    let service = SerialHandler::new(config.clone())
+    let service = handler
         .serve(stdio()).await.map_err(|e| {
             error!("Serving error: {:?}", e);
             SerialError::InternalError(format!("Failed to start server: {}", e))
@@ -77,14 +81,25 @@ async fn main() -> Result<()> {
     
     info!("Serial MCP Server started successfully");
     
-    // Wait for the service to complete
-    service.waiting().await.map_err(|e| {
-        error!("Service error: {:?}", e);
-        SerialError::InternalError(format!("Service error: {}", e))
-    })?;
+    // Wait for the service to complete or for shutdown signal
+    tokio::select! {
+        result = service.waiting() => {
+            if let Err(e) = result {
+                // Log but don't treat as fatal - this often happens on clean shutdown
+                debug!("Service ended: {:?}", e);
+            }
+        }
+        _ = tokio::signal::ctrl_c() => {
+            info!("Received shutdown signal");
+        }
+    }
 
-    // Cleanup
+    // Cleanup: close all open connections
     info!("Cleaning up resources...");
+    let closed = connection_manager.close_all().await;
+    if closed > 0 {
+        info!("Closed {} open connection(s)", closed);
+    }
 
     info!("Serial MCP Server stopped");
     Ok(())

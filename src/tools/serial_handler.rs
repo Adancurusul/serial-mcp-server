@@ -37,6 +37,12 @@ impl SerialHandler {
         }
     }
 
+    /// Get a reference to the connection manager for shutdown handling
+    pub fn connection_manager(&self) -> Arc<ConnectionManager> {
+        Arc::clone(&self.connection_manager)
+    }
+
+
     #[tool(description = "List all available serial ports on the system")]
     async fn list_ports(&self) -> Result<CallToolResult, McpError> {
         debug!("Listing available serial ports");
