@@ -56,6 +56,15 @@ pub struct ReadArgs {
 fn default_max_bytes() -> usize { 1024 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
+pub struct SetControlLinesArgs {
+    pub connection_id: String,
+    #[serde(default)]
+    pub rts: Option<bool>,
+    #[serde(default)]
+    pub dtr: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
 pub struct ConfigureArgs {
     pub connection_id: String,
     pub baud_rate: Option<u32>,
