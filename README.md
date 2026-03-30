@@ -225,3 +225,8 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 ---
 
 ⭐ If this project helps you, please give us a Star!
+
+## Hosted deployment
+
+A hosted deployment is available on [Fronteir AI](https://fronteir.ai/mcp/adancurusul-serial-mcp-server).
+
