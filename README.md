@@ -149,7 +149,7 @@ Windows example:
 | `macro_load` | Validate and load an inline macro pack or pack file path into the server's in-memory registry. |
 | `macro_list` | List loaded macro packs, macros, and assemblies. |
 | `macro_unload` | Remove a loaded macro pack from the in-memory registry. |
-| `macro_plan` | Expand a loaded macro or assembly without opening hardware. |
+| `macro_plan` | Expand a loaded, inline, or file-backed macro or assembly without opening hardware. |
 | `macro_run` | Run a loaded macro or assembly against an existing connection or explicit simulation input. |
 | `macro_run_inline` | Validate, plan, and run an inline macro pack without storing it in the registry. |
 

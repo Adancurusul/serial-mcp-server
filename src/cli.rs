@@ -35,11 +35,29 @@ pub async fn run(command: Command, config: &Config) -> Result<()> {
 }
 
 async fn macro_command(args: MacroCommand, config: &Config) -> Result<()> {
-    match args {
+    let json = macro_command_json(&args);
+    let result = match args {
         MacroCommand::Validate(args) => macro_validate(args),
         MacroCommand::List(args) => macro_list(args),
         MacroCommand::Plan(args) => macro_plan(args),
         MacroCommand::Run(args) => macro_run(args, config).await,
+    };
+
+    if let Err(error) = result {
+        if json {
+            print_json(&MacroErrorOutput::from_error(&error))?;
+        }
+        return Err(error);
+    }
+
+    Ok(())
+}
+
+fn macro_command_json(args: &MacroCommand) -> bool {
+    match args {
+        MacroCommand::Validate(args) | MacroCommand::List(args) => args.json,
+        MacroCommand::Plan(args) => args.json,
+        MacroCommand::Run(args) => args.json,
     }
 }
 
@@ -544,4 +562,53 @@ struct MacroDryRunOutput {
     mode: &'static str,
     success: bool,
     plan: crate::automation::MacroPlan,
+}
+
+#[derive(Debug, Serialize)]
+struct MacroErrorOutput {
+    status: &'static str,
+    error: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    field: Option<String>,
+}
+
+impl MacroErrorOutput {
+    fn from_error(error: &SerialError) -> Self {
+        let message = error.to_string();
+        Self {
+            status: "error",
+            field: macro_error_field(&message),
+            error: message,
+        }
+    }
+}
+
+fn macro_error_field(message: &str) -> Option<String> {
+    let message = message
+        .strip_prefix("Invalid configuration: ")
+        .or_else(|| message.strip_prefix("Serialization error: "))
+        .unwrap_or(message);
+
+    for prefix in ["invalid macro pack at ", "data encoding error at "] {
+        if let Some(rest) = message.strip_prefix(prefix) {
+            return rest.split(':').next().map(str::to_string);
+        }
+    }
+
+    if let Some(field) = backtick_value_after(message, "unknown field `") {
+        return Some(field);
+    }
+    if let Some(field) = backtick_value_after(message, "missing field `") {
+        return Some(field);
+    }
+    if message.contains("unknown variant `") {
+        return Some("type".to_string());
+    }
+
+    None
+}
+
+fn backtick_value_after(message: &str, prefix: &str) -> Option<String> {
+    let rest = message.split_once(prefix)?.1;
+    Some(rest.split_once('`')?.0.to_string())
 }

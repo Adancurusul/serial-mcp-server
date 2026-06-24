@@ -149,7 +149,7 @@ Windows 示例：
 | `macro_load` | 验证并把 inline macro pack 或 pack 文件路径加载到服务器内存 registry。 |
 | `macro_list` | 列出已加载的 macro pack、macro 和 assembly。 |
 | `macro_unload` | 从内存 registry 移除已加载的 macro pack。 |
-| `macro_plan` | 无硬件展开已加载 macro 或 assembly。 |
+| `macro_plan` | 无硬件展开已加载、inline 或文件形式的 macro 或 assembly。 |
 | `macro_run` | 基于已有连接或显式 simulation 输入运行已加载 macro 或 assembly。 |
 | `macro_run_inline` | 不存入 registry，直接验证、规划并运行 inline macro pack。 |
 

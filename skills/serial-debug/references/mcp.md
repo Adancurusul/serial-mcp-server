@@ -21,7 +21,7 @@ No-subcommand startup is kept compatible with existing stdio server behavior, bu
 - `macro_load`: validate and load an inline macro pack or pack file path into the runtime registry.
 - `macro_list`: list loaded macro packs, macros, and assemblies.
 - `macro_unload`: remove a loaded macro pack from the runtime registry.
-- `macro_plan`: expand a loaded macro or assembly without opening hardware.
+- `macro_plan`: expand a loaded, inline, or file-backed macro or assembly without opening hardware.
 - `macro_run`: run a loaded macro or assembly with an existing connection or explicit simulation input.
 - `macro_run_inline`: validate, plan, and run an inline macro pack without storing it in the registry.
 

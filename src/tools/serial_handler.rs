@@ -74,9 +74,24 @@ impl SerialHandler {
 
     pub async fn macro_plan_pack(&self, args: MacroPlanArgs) -> Result<MacroPlan, McpError> {
         let target = args.target.into_target().map_err(mcp_error)?;
-        self.macro_registry
-            .plan(&args.pack_id, target)
-            .map_err(mcp_error)
+        match (args.pack_id, args.pack_json, args.path) {
+            (Some(pack_id), None, None) => self
+                .macro_registry
+                .plan(&pack_id, target)
+                .map_err(mcp_error),
+            (None, Some(pack_json), None) => {
+                let pack: MacroPack = serde_json::from_str(&pack_json).map_err(mcp_error)?;
+                plan_target(&pack, target).map_err(mcp_error)
+            }
+            (None, None, Some(path)) => {
+                let pack_json = std::fs::read_to_string(path).map_err(mcp_error)?;
+                let pack: MacroPack = serde_json::from_str(&pack_json).map_err(mcp_error)?;
+                plan_target(&pack, target).map_err(mcp_error)
+            }
+            _ => Err(mcp_error(
+                "Specify exactly one of pack_id, pack_json, or path for macro_plan",
+            )),
+        }
     }
 
     pub async fn macro_run_loaded(&self, args: MacroRunArgs) -> Result<RunReport, McpError> {

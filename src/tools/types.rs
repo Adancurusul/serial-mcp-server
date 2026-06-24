@@ -145,7 +145,12 @@ impl MacroTargetArgs {
 
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct MacroPlanArgs {
-    pub pack_id: String,
+    #[serde(default)]
+    pub pack_id: Option<String>,
+    #[serde(default)]
+    pub pack_json: Option<String>,
+    #[serde(default)]
+    pub path: Option<String>,
     pub target: MacroTargetArgs,
 }
 

@@ -3,8 +3,11 @@ use serial_mcp_server::automation::{
     plan_target, validate_pack, MacroExecutor, MacroPack, MacroTarget, SimulatedMacroTransport,
 };
 use serial_mcp_server::config::{Args, Command, MacroCommand};
-use serial_mcp_server::tools::{MacroLoadArgs, MacroRunArgs, MacroRunInput, MacroTargetArgs};
+use serial_mcp_server::tools::{
+    MacroLoadArgs, MacroPlanArgs, MacroRunArgs, MacroRunInput, MacroTargetArgs,
+};
 use serial_mcp_server::{Config, SerialHandler};
+use std::process::Command as CliCommand;
 
 fn pack_json() -> &'static str {
     r#"{
@@ -228,6 +231,30 @@ async fn macro_mcp_registry_is_runtime_only() {
         .await
         .expect("fresh server should list");
     assert!(fresh_list.packs.is_empty());
+
+    let inline_plan = fresh
+        .macro_plan_pack(MacroPlanArgs {
+            pack_id: None,
+            pack_json: Some(pack_json().to_string()),
+            path: None,
+            target: MacroTargetArgs::assembly_named("boot-check"),
+        })
+        .await
+        .expect("inline pack should plan without loading");
+    assert_eq!(inline_plan.target_kind, "assembly");
+    assert_eq!(inline_plan.steps.len(), 5);
+
+    let path_plan = fresh
+        .macro_plan_pack(MacroPlanArgs {
+            pack_id: None,
+            pack_json: None,
+            path: Some("examples/macros/ping.json".to_string()),
+            target: MacroTargetArgs::macro_named("ping"),
+        })
+        .await
+        .expect("path pack should plan without loading");
+    assert_eq!(path_plan.target_kind, "macro");
+    assert_eq!(path_plan.steps.len(), 2);
 }
 
 #[test]
@@ -286,4 +313,59 @@ fn macro_hardware_boundary_is_explicit() {
     };
     assert_eq!(simulation_run.serial.port, None);
     assert_eq!(simulation_run.simulate_read, vec!["PONG"]);
+}
+
+#[test]
+fn macro_cli_json_errors_are_structured() {
+    let output = CliCommand::new(env!("CARGO_BIN_EXE_serial-mcp-server"))
+        .args([
+            "macro",
+            "plan",
+            "--file",
+            "examples/macros/ping.json",
+            "--json",
+        ])
+        .output()
+        .expect("binary should run");
+    assert!(!output.status.success());
+    let json: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("stdout should be JSON");
+    assert_eq!(json["status"], "error");
+    assert!(json["error"]
+        .as_str()
+        .expect("error should be text")
+        .contains("Specify exactly one of --macro or --assembly"));
+
+    let invalid_pack = tempfile::NamedTempFile::new().expect("temp file should create");
+    std::fs::write(
+        invalid_pack.path(),
+        r#"{
+            "schema_version": "0.3",
+            "name": "bad-pack",
+            "macros": [
+                { "name": "ping", "steps": [{ "type": "send", "data": "A" }] },
+                { "name": "ping", "steps": [{ "type": "send", "data": "B" }] }
+            ]
+        }"#,
+    )
+    .expect("temp file should write");
+
+    let output = CliCommand::new(env!("CARGO_BIN_EXE_serial-mcp-server"))
+        .args([
+            "macro",
+            "validate",
+            "--file",
+            invalid_pack
+                .path()
+                .to_str()
+                .expect("temp path should be utf8"),
+            "--json",
+        ])
+        .output()
+        .expect("binary should run");
+    assert!(!output.status.success());
+    let json: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("stdout should be JSON");
+    assert_eq!(json["status"], "error");
+    assert_eq!(json["field"], "macros[1].name");
 }
