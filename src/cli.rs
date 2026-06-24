@@ -45,7 +45,7 @@ async fn macro_command(args: MacroCommand, config: &Config) -> Result<()> {
 
     if let Err(error) = result {
         if json {
-            print_json(&MacroErrorOutput::from_error(&error))?;
+            print_macro_json_error(&error.to_string())?;
         }
         return Err(error);
     }
@@ -494,6 +494,10 @@ fn print_json<T: Serialize>(value: &T) -> Result<()> {
     Ok(())
 }
 
+pub fn print_macro_json_error(message: &str) -> Result<()> {
+    print_json(&MacroErrorOutput::from_message(message))
+}
+
 impl CliDataFormat {
     fn as_data_format(self) -> DataFormat {
         match self {
@@ -573,12 +577,11 @@ struct MacroErrorOutput {
 }
 
 impl MacroErrorOutput {
-    fn from_error(error: &SerialError) -> Self {
-        let message = error.to_string();
+    fn from_message(message: &str) -> Self {
         Self {
             status: "error",
-            field: macro_error_field(&message),
-            error: message,
+            field: macro_error_field(message),
+            error: message.to_string(),
         }
     }
 }

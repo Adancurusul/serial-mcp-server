@@ -368,4 +368,27 @@ fn macro_cli_json_errors_are_structured() {
         serde_json::from_slice(&output.stdout).expect("stdout should be JSON");
     assert_eq!(json["status"], "error");
     assert_eq!(json["field"], "macros[1].name");
+
+    let output = CliCommand::new(env!("CARGO_BIN_EXE_serial-mcp-server"))
+        .args([
+            "macro",
+            "plan",
+            "--file",
+            "examples/macros/ping.json",
+            "--macro",
+            "ping",
+            "--assembly",
+            "boot-check",
+            "--json",
+        ])
+        .output()
+        .expect("binary should run");
+    assert!(!output.status.success());
+    let json: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("clap error stdout should be JSON");
+    assert_eq!(json["status"], "error");
+    assert!(json["error"]
+        .as_str()
+        .expect("error should be text")
+        .contains("cannot be used with"));
 }
