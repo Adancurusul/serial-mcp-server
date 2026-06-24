@@ -1,6 +1,6 @@
 ---
 name: serial-debug
-description: CLI-first serial port debugging with serial-mcp-server for Codex and Claude Code. Use when working with UART or USB-serial devices, listing serial ports, probing STM32/Arduino/ESP32 boards, writing or reading serial data, controlling RTS/DTR, or using serial-mcp-server through MCP tools.
+description: CLI-first serial port debugging and macro automation with serial-mcp-server for Codex and Claude Code. Use when working with UART or USB-serial devices, listing serial ports, probing STM32/Arduino/ESP32 boards, writing or reading serial data, running JSON serial macros, controlling RTS/DTR, or using serial-mcp-server through MCP tools.
 ---
 
 # Serial Debug
@@ -35,6 +35,17 @@ serial-mcp-server write --port <port> --baud 115200 --data H --read --timeout-ms
 ```bash
 serial-mcp-server set-control-lines --port <port> --rts high --dtr low --json
 ```
+
+5. For repeatable serial procedures, prefer JSON macro packs and validate or plan them before real hardware execution:
+
+```bash
+serial-mcp-server macro validate --file <pack.json> --json
+serial-mcp-server macro plan --file <pack.json> --macro <name> --json
+serial-mcp-server macro run --file <pack.json> --macro <name> --simulate-read <response> --json
+serial-mcp-server macro run --file <pack.json> --macro <name> --port <port> --baud 115200 --json
+```
+
+Macro packs are restricted JSON DSL files. v0.3 supports `send`, `delay`, `expect contains`, `expect equals`, and assemblies that call macros. It does not support shell commands, language execution, loops, variables, Quick commands, or RTS/DTR macro steps.
 
 ## References
 

@@ -8,11 +8,16 @@ use rmcp::{
     service::RequestContext,
     tool, tool_handler, tool_router, ErrorData as McpError, RoleServer, ServerHandler,
 };
+use serde::Serialize;
 use std::future::Future;
 use std::sync::Arc;
 use tracing::{debug, error, info};
 
 use super::types::*;
+use crate::automation::{
+    plan_target, MacroExecutor, MacroPack, MacroPlan, MacroRegistry, RunReport,
+    SerialMacroTransport, SimulatedMacroTransport,
+};
 use crate::config::Config;
 use crate::serial::{ConnectionManager, PortInfo};
 
@@ -20,6 +25,7 @@ use crate::serial::{ConnectionManager, PortInfo};
 #[derive(Clone)]
 pub struct SerialHandler {
     connection_manager: Arc<ConnectionManager>,
+    macro_registry: Arc<MacroRegistry>,
     #[allow(dead_code)]
     config: Config,
     tool_router: ToolRouter<SerialHandler>,
@@ -30,6 +36,7 @@ impl SerialHandler {
     pub fn new(config: Config) -> Self {
         Self {
             connection_manager: Arc::new(ConnectionManager::new()),
+            macro_registry: Arc::new(MacroRegistry::default()),
             config,
             tool_router: Self::tool_router(),
         }
@@ -38,6 +45,137 @@ impl SerialHandler {
     /// Get a reference to the connection manager for shutdown handling
     pub fn connection_manager(&self) -> Arc<ConnectionManager> {
         Arc::clone(&self.connection_manager)
+    }
+
+    pub async fn macro_load_pack(
+        &self,
+        args: MacroLoadArgs,
+    ) -> Result<crate::automation::MacroLoadRecord, McpError> {
+        let input = macro_pack_input(args)?;
+        self.macro_registry.load_json(&input).map_err(mcp_error)
+    }
+
+    pub async fn macro_list_packs(
+        &self,
+        pack_id: Option<String>,
+    ) -> Result<crate::automation::MacroList, McpError> {
+        self.macro_registry
+            .list(pack_id.as_deref())
+            .map_err(mcp_error)
+    }
+
+    pub async fn macro_unload_pack(&self, pack_id: &str) -> Result<MacroUnloadResponse, McpError> {
+        let unloaded = self.macro_registry.unload(pack_id).map_err(mcp_error)?;
+        Ok(MacroUnloadResponse {
+            pack_id: pack_id.to_string(),
+            unloaded,
+        })
+    }
+
+    pub async fn macro_plan_pack(&self, args: MacroPlanArgs) -> Result<MacroPlan, McpError> {
+        let target = args.target.into_target().map_err(mcp_error)?;
+        self.macro_registry
+            .plan(&args.pack_id, target)
+            .map_err(mcp_error)
+    }
+
+    pub async fn macro_run_loaded(&self, args: MacroRunArgs) -> Result<RunReport, McpError> {
+        let target = args.target.into_target().map_err(mcp_error)?;
+        let plan = self
+            .macro_registry
+            .plan(&args.pack_id, target)
+            .map_err(mcp_error)?;
+        self.run_macro_plan(plan, args.input).await
+    }
+
+    pub async fn macro_run_inline_pack(
+        &self,
+        args: MacroRunInlineArgs,
+    ) -> Result<RunReport, McpError> {
+        let pack: MacroPack = serde_json::from_str(&args.pack_json).map_err(mcp_error)?;
+        let target = args.target.into_target().map_err(mcp_error)?;
+        let plan = plan_target(&pack, target).map_err(mcp_error)?;
+        self.run_macro_plan(plan, args.input).await
+    }
+
+    async fn run_macro_plan(
+        &self,
+        plan: MacroPlan,
+        input: MacroRunInput,
+    ) -> Result<RunReport, McpError> {
+        match input {
+            MacroRunInput::Connection { connection_id } => {
+                let connection = self
+                    .connection_manager
+                    .get(&connection_id)
+                    .await
+                    .map_err(mcp_error)?;
+                MacroExecutor::real()
+                    .run(plan, SerialMacroTransport::new(connection))
+                    .await
+                    .map_err(mcp_error)
+            }
+            MacroRunInput::Simulation { reads } => {
+                let reads = reads
+                    .iter()
+                    .map(|chunk| chunk.as_bytes().to_vec())
+                    .collect();
+                MacroExecutor::simulated()
+                    .run(plan, SimulatedMacroTransport::new(reads))
+                    .await
+                    .map_err(mcp_error)
+            }
+        }
+    }
+
+    #[tool(description = "Validate and load a JSON macro pack into the runtime registry")]
+    async fn macro_load(
+        &self,
+        Parameters(args): Parameters<MacroLoadArgs>,
+    ) -> Result<CallToolResult, McpError> {
+        tool_json(&self.macro_load_pack(args).await?)
+    }
+
+    #[tool(description = "List loaded runtime macro packs")]
+    async fn macro_list(
+        &self,
+        Parameters(args): Parameters<MacroListArgs>,
+    ) -> Result<CallToolResult, McpError> {
+        tool_json(&self.macro_list_packs(args.pack_id).await?)
+    }
+
+    #[tool(description = "Unload a runtime macro pack")]
+    async fn macro_unload(
+        &self,
+        Parameters(args): Parameters<MacroUnloadArgs>,
+    ) -> Result<CallToolResult, McpError> {
+        tool_json(&self.macro_unload_pack(&args.pack_id).await?)
+    }
+
+    #[tool(description = "Expand a loaded macro or assembly without opening hardware")]
+    async fn macro_plan(
+        &self,
+        Parameters(args): Parameters<MacroPlanArgs>,
+    ) -> Result<CallToolResult, McpError> {
+        tool_json(&self.macro_plan_pack(args).await?)
+    }
+
+    #[tool(
+        description = "Run a loaded macro or assembly with an existing connection or simulation"
+    )]
+    async fn macro_run(
+        &self,
+        Parameters(args): Parameters<MacroRunArgs>,
+    ) -> Result<CallToolResult, McpError> {
+        tool_json(&self.macro_run_loaded(args).await?)
+    }
+
+    #[tool(description = "Validate, plan, and run an inline macro pack without loading it")]
+    async fn macro_run_inline(
+        &self,
+        Parameters(args): Parameters<MacroRunInlineArgs>,
+    ) -> Result<CallToolResult, McpError> {
+        tool_json(&self.macro_run_inline_pack(args).await?)
     }
 
     #[tool(description = "List all available serial ports on the system")]
@@ -363,6 +501,26 @@ impl ServerHandler for SerialHandler {
         info!("Serial MCP server initialized");
         Ok(self.get_info())
     }
+}
+
+fn macro_pack_input(args: MacroLoadArgs) -> Result<String, McpError> {
+    match (args.pack_json, args.path) {
+        (Some(input), None) => Ok(input),
+        (None, Some(path)) => std::fs::read_to_string(path).map_err(mcp_error),
+        _ => Err(mcp_error(
+            "Specify exactly one of pack_json or path for macro_load",
+        )),
+    }
+}
+
+fn tool_json<T: Serialize>(value: &T) -> Result<CallToolResult, McpError> {
+    serde_json::to_string_pretty(value)
+        .map(|json| CallToolResult::success(vec![Content::text(json)]))
+        .map_err(mcp_error)
+}
+
+fn mcp_error(error: impl std::fmt::Display) -> McpError {
+    McpError::internal_error(error.to_string(), None)
 }
 
 /// Decode data to bytes array

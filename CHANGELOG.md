@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.3.0 - 2026-06-24
+
+### Added
+
+- Added v0.3 JSON Macro DSL packs with strict validation for macros and assemblies.
+- Added CLI macro commands: `macro validate`, `macro list`, `macro plan`, and `macro run`.
+- Added macro executor support for `send`, `delay`, `expect contains`, and `expect equals`.
+- Added explicit simulation mode for no-hardware macro execution tests and CLI smoke checks.
+- Added MCP macro tools: `macro_load`, `macro_list`, `macro_unload`, `macro_plan`, `macro_run`, and `macro_run_inline`.
+- Added runtime-only MCP macro registry. Loaded packs are cleared on server restart.
+- Added `examples/macros/ping.json` as a minimal valid macro pack.
+
+### Changed
+
+- Updated package version to `0.3.0`.
+- Updated README, README_ZH, and serial-debug skill docs to describe CLI, skill, and MCP macro usage paths.
+
+### Not Included
+
+- No independent Quick API. Quick-style operations should be represented as macros.
+- No persistent macro library managed by the server.
+- No RTS/DTR macro steps and no general scripting features.
+
 ## 0.2.0 - 2026-06-24
 
 ### Added

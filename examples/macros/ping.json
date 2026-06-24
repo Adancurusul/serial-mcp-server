@@ -1,0 +1,37 @@
+{
+  "schema_version": "0.3",
+  "name": "ping-pack",
+  "description": "Minimal ping/pong serial macro pack for CLI, MCP, and simulation smoke tests.",
+  "macros": [
+    {
+      "name": "ping",
+      "description": "Send PING and wait for PONG.",
+      "steps": [
+        {
+          "type": "send",
+          "data": "PING\n",
+          "encoding": "utf8"
+        },
+        {
+          "type": "expect",
+          "op": "contains",
+          "data": "PONG",
+          "encoding": "utf8",
+          "timeout_ms": 1000
+        }
+      ]
+    }
+  ],
+  "assemblies": [
+    {
+      "name": "boot-check",
+      "description": "Example assembly that composes one macro.",
+      "steps": [
+        {
+          "type": "macro",
+          "name": "ping"
+        }
+      ]
+    }
+  ]
+}

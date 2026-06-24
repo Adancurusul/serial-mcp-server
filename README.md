@@ -9,9 +9,17 @@
 - MCP stdio server for clients that support MCP tools.
 - Scriptable CLI for direct use, CI, and agent skills without MCP setup.
 
-Current release target: `0.2.0`.
+Current release target: `0.3.0`.
 
 Language versions: [English](README.md) | [Chinese](README_ZH.md)
+
+## 0.3.0 Update Brief
+
+- Added JSON Macro DSL automation for repeatable serial procedures.
+- Added CLI macro commands: `macro validate`, `macro list`, `macro plan`, and `macro run`.
+- Added MCP macro tools for runtime in-memory pack load/list/unload, plan, and run.
+- Added explicit no-hardware simulation for macro validation, planning, and executor smoke tests.
+- Kept Quick out of the public API. Quick-style use cases should be represented as macros.
 
 ## Requirements
 
@@ -51,6 +59,21 @@ serial-mcp-server write --port <port> --baud 115200 --data H --read --timeout-ms
 serial-mcp-server read --port <port> --baud 115200 --timeout-ms 1000 --json
 serial-mcp-server set-control-lines --port <port> --rts high --dtr low --json
 ```
+
+Macro automation commands:
+
+```bash
+serial-mcp-server macro validate --file examples/macros/ping.json --json
+serial-mcp-server macro list --file examples/macros/ping.json --json
+serial-mcp-server macro plan --file examples/macros/ping.json --macro ping --json
+serial-mcp-server macro run --file examples/macros/ping.json --macro ping --dry-run --json
+serial-mcp-server macro run --file examples/macros/ping.json --macro ping --simulate-read PONG --json
+serial-mcp-server macro run --file examples/macros/ping.json --macro ping --port <port> --baud 115200 --json
+```
+
+Macro packs are JSON files with `schema_version` set to `0.3`. v0.3 supports `send`, `delay`, and `expect` steps inside macros, plus assemblies that call macros by name. `expect` supports `contains` and `equals`.
+
+The macro DSL is intentionally restricted. It does not run shell commands, JavaScript, Python, file operations, loops, variables, if/else branches, Quick commands, or RTS/DTR macro steps.
 
 Configuration commands:
 
@@ -123,6 +146,14 @@ Windows example:
 | `read` | Read data from an open connection with timeout handling. |
 | `close` | Close an open connection. |
 | `set_control_lines` | Set RTS and/or DTR on an open connection. |
+| `macro_load` | Validate and load an inline macro pack or pack file path into the server's in-memory registry. |
+| `macro_list` | List loaded macro packs, macros, and assemblies. |
+| `macro_unload` | Remove a loaded macro pack from the in-memory registry. |
+| `macro_plan` | Expand a loaded macro or assembly without opening hardware. |
+| `macro_run` | Run a loaded macro or assembly against an existing connection or explicit simulation input. |
+| `macro_run_inline` | Validate, plan, and run an inline macro pack without storing it in the registry. |
+
+The MCP macro registry is runtime-only. Restarting the server clears loaded packs, and the server does not write a persistent macro library.
 
 ## Agent Skill
 
@@ -132,7 +163,7 @@ The repository includes a Claude Code and Codex compatible skill at:
 skills/serial-debug/
 ```
 
-The skill is CLI-first and documents MCP as an optional configured path. It is intended for agents that need to list ports, run serial smoke tests, control RTS/DTR, or troubleshoot UART/USB-serial devices.
+The skill is CLI-first and documents MCP as an optional configured path. It is intended for agents that need to list ports, run serial smoke tests, run macro automation, control RTS/DTR, or troubleshoot UART/USB-serial devices.
 
 For local development, copy the skill folder into the agent skill roots:
 
@@ -190,6 +221,8 @@ cargo run --locked -- --help
 cargo run --locked -- list-ports --json
 cargo run --locked -- write --help
 cargo run --locked -- set-control-lines --help
+cargo run --locked -- macro validate --file examples/macros/ping.json --json
+cargo run --locked -- macro run --file examples/macros/ping.json --macro ping --simulate-read PONG --json
 ```
 
 ## License

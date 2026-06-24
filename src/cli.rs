@@ -1,5 +1,10 @@
+use crate::automation::{
+    plan_target, validate_pack, MacroExecutor, MacroPack, MacroTarget, SerialMacroTransport,
+    SimulatedMacroTransport,
+};
 use crate::config::{
-    CliDataFormat, Command, ControlLineLevel, ReadCommand, SerialPortArgs, SetControlLinesCommand,
+    CliDataFormat, Command, ControlLineLevel, MacroCommand, MacroFileCommand, MacroPlanCommand,
+    MacroRunCommand, OptionalSerialPortArgs, ReadCommand, SerialPortArgs, SetControlLinesCommand,
     WriteCommand,
 };
 use crate::error::{Result, SerialError};
@@ -10,6 +15,7 @@ use crate::serial::{
 use crate::utils::{DataConverter, DataFormat};
 use crate::Config;
 use serde::Serialize;
+use std::sync::Arc;
 
 pub async fn run(command: Command, config: &Config) -> Result<()> {
     match command {
@@ -18,11 +24,149 @@ pub async fn run(command: Command, config: &Config) -> Result<()> {
         Command::Write(args) => write(args, config).await,
         Command::Read(args) => read(args, config).await,
         Command::SetControlLines(args) => set_control_lines(args, config).await,
+        Command::Macro(args) => macro_command(args, config).await,
         Command::Serve
         | Command::GenerateConfig
         | Command::ValidateConfig
         | Command::ShowConfig => Err(SerialError::InternalError(
             "server/config command reached CLI command dispatcher".to_string(),
+        )),
+    }
+}
+
+async fn macro_command(args: MacroCommand, config: &Config) -> Result<()> {
+    match args {
+        MacroCommand::Validate(args) => macro_validate(args),
+        MacroCommand::List(args) => macro_list(args),
+        MacroCommand::Plan(args) => macro_plan(args),
+        MacroCommand::Run(args) => macro_run(args, config).await,
+    }
+}
+
+fn macro_validate(args: MacroFileCommand) -> Result<()> {
+    let pack = load_macro_pack(&args.file)?;
+    let inventory = validate_pack(&pack)?;
+    if args.json {
+        print_json(&MacroValidateOutput {
+            status: "ok",
+            inventory,
+        })?;
+    } else {
+        println!("Macro pack {} is valid", pack.name);
+    }
+    Ok(())
+}
+
+fn macro_list(args: MacroFileCommand) -> Result<()> {
+    let pack = load_macro_pack(&args.file)?;
+    let inventory = validate_pack(&pack)?;
+    if args.json {
+        print_json(&inventory)?;
+    } else {
+        println!("Macros:");
+        for name in inventory.macros {
+            println!("- {}", name);
+        }
+        if !inventory.assemblies.is_empty() {
+            println!("Assemblies:");
+            for name in inventory.assemblies {
+                println!("- {}", name);
+            }
+        }
+    }
+    Ok(())
+}
+
+fn macro_plan(args: MacroPlanCommand) -> Result<()> {
+    let pack = load_macro_pack(&args.file)?;
+    let target = macro_target(args.macro_name, args.assembly)?;
+    let plan = plan_target(&pack, target)?;
+    if args.json {
+        print_json(&plan)?;
+    } else {
+        println!(
+            "{} {} has {} step(s)",
+            plan.target_kind,
+            plan.target_name,
+            plan.steps.len()
+        );
+    }
+    Ok(())
+}
+
+async fn macro_run(args: MacroRunCommand, config: &Config) -> Result<()> {
+    let pack = load_macro_pack(&args.file)?;
+    let target = macro_target(args.macro_name, args.assembly)?;
+    let plan = plan_target(&pack, target)?;
+
+    if args.dry_run {
+        let output = MacroDryRunOutput {
+            mode: "dry_run",
+            success: true,
+            plan,
+        };
+        if args.json {
+            print_json(&output)?;
+        } else {
+            println!(
+                "Dry run {} {} with {} step(s)",
+                output.plan.target_kind,
+                output.plan.target_name,
+                output.plan.steps.len()
+            );
+        }
+        return Ok(());
+    }
+
+    if !args.simulate_read.is_empty() {
+        let reads = args
+            .simulate_read
+            .iter()
+            .map(|chunk| chunk.as_bytes().to_vec())
+            .collect();
+        let report = MacroExecutor::simulated()
+            .run(plan, SimulatedMacroTransport::new(reads))
+            .await?;
+        if args.json {
+            print_json(&report)?;
+        } else {
+            println!(
+                "Macro {} {} completed in simulation",
+                report.target_kind, report.target_name
+            );
+        }
+        return Ok(());
+    }
+
+    let connection_config = macro_connection_config(&args.serial, config)?;
+    let connection = Arc::new(open_connection(connection_config).await?);
+    let report = MacroExecutor::real()
+        .run(plan, SerialMacroTransport::new(connection))
+        .await?;
+    if args.json {
+        print_json(&report)?;
+    } else {
+        println!(
+            "Macro {} {} completed",
+            report.target_kind, report.target_name
+        );
+    }
+    Ok(())
+}
+
+fn load_macro_pack(path: &std::path::Path) -> Result<MacroPack> {
+    let content = std::fs::read_to_string(path)?;
+    let pack = serde_json::from_str::<MacroPack>(&content)?;
+    validate_pack(&pack)?;
+    Ok(pack)
+}
+
+fn macro_target(macro_name: Option<String>, assembly: Option<String>) -> Result<MacroTarget> {
+    match (macro_name, assembly) {
+        (Some(name), None) => Ok(MacroTarget::macro_named(name)),
+        (None, Some(name)) => Ok(MacroTarget::assembly_named(name)),
+        _ => Err(SerialError::InvalidConfig(
+            "Specify exactly one of --macro or --assembly".to_string(),
         )),
     }
 }
@@ -242,6 +386,38 @@ fn connection_config(args: &SerialPortArgs, config: &Config) -> Result<Connectio
     })
 }
 
+fn macro_connection_config(
+    args: &OptionalSerialPortArgs,
+    config: &Config,
+) -> Result<ConnectionConfig> {
+    let Some(port) = &args.port else {
+        return Err(SerialError::InvalidConfig(
+            "macro run requires --dry-run, --simulate-read, or --port".to_string(),
+        ));
+    };
+    let stop_bits = args
+        .stop_bits
+        .as_deref()
+        .unwrap_or(&config.serial.default_stop_bits);
+    let parity = args
+        .parity
+        .as_deref()
+        .unwrap_or(&config.serial.default_parity);
+    let flow_control = args
+        .flow_control
+        .as_deref()
+        .unwrap_or(&config.serial.default_flow_control);
+
+    Ok(ConnectionConfig {
+        port: port.clone(),
+        baud_rate: args.baud.unwrap_or(config.serial.default_baud_rate),
+        data_bits: parse_data_bits(args.data_bits.unwrap_or(config.serial.default_data_bits))?,
+        stop_bits: parse_stop_bits(stop_bits)?,
+        parity: parse_parity(parity)?,
+        flow_control: parse_flow_control(flow_control)?,
+    })
+}
+
 fn parse_data_bits(value: u8) -> Result<DataBits> {
     match value {
         5 => Ok(DataBits::Five),
@@ -355,4 +531,17 @@ struct ControlLinesOutput {
     rts: Option<&'static str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     dtr: Option<&'static str>,
+}
+
+#[derive(Debug, Serialize)]
+struct MacroValidateOutput {
+    status: &'static str,
+    inventory: crate::automation::MacroInventory,
+}
+
+#[derive(Debug, Serialize)]
+struct MacroDryRunOutput {
+    mode: &'static str,
+    success: bool,
+    plan: crate::automation::MacroPlan,
 }

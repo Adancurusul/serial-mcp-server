@@ -18,6 +18,14 @@ No-subcommand startup is kept compatible with existing stdio server behavior, bu
 - `read`: read data from an open connection with timeout handling.
 - `close`: close an open connection.
 - `set_control_lines`: set RTS and/or DTR on an open connection.
+- `macro_load`: validate and load an inline macro pack or pack file path into the runtime registry.
+- `macro_list`: list loaded macro packs, macros, and assemblies.
+- `macro_unload`: remove a loaded macro pack from the runtime registry.
+- `macro_plan`: expand a loaded macro or assembly without opening hardware.
+- `macro_run`: run a loaded macro or assembly with an existing connection or explicit simulation input.
+- `macro_run_inline`: validate, plan, and run an inline macro pack without storing it in the registry.
+
+The macro registry is in-memory only. Restarting the MCP server clears loaded macro packs.
 
 ## Agent Behavior
 
@@ -25,3 +33,4 @@ No-subcommand startup is kept compatible with existing stdio server behavior, bu
 - Close connections after smoke tests.
 - If an MCP client is not configured, switch to the CLI path and state that the CLI path was used.
 - Do not mix MCP connection ids with CLI one-shot commands; CLI commands open and close their own connections.
+- For macro workflows, call `macro_plan` before `macro_run` when the user asks for reviewable automation steps.
