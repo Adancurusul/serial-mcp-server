@@ -2,16 +2,6 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Aragorn Workflow
-
-This repository is managed with Aragorn workflow docs under `doc/`.
-
-- Canonical workflow entry: `/aragorn:flow`
-- Bare `/flow`, `/dev`, `/testing`, `/checkpoint`, and `/task-done` are only compatibility shorthands when locally aliased.
-- Before workflow work, read `doc/state.json`, `doc/progress.md`, `doc/project-info.md`, recent `doc/dev.md`, `doc/flow-config.json`, and `doc/preferences.md`.
-- Use task worktrees for source changes. Keep `main` as the base branch.
-- Do not stage volatile runtime files under `doc/workflow/context-artifacts/` or `doc/workflow/workspaces/index.json`.
-
 ## Build & Run Commands
 
 ```bash
