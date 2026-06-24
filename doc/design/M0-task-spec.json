@@ -1,0 +1,71 @@
+{
+  "design_context": {
+    "doc_path": "doc/design/M0-quality-audit.md",
+    "summary": "Record Aragorn takeover state and run a source-free quality audit before code changes.",
+    "anchors_ref": "doc/preferences.md#concept-anchors"
+  },
+  "boundaries": {
+    "allow": [
+      "doc/**",
+      "AGENTS.md",
+      "CLAUDE.md",
+      ".gitignore"
+    ],
+    "deny": [
+      "src/**",
+      "tests/**",
+      "examples/**/src/**",
+      "Cargo.toml",
+      "Cargo.lock"
+    ]
+  },
+  "forbidden_patterns": [
+    {
+      "pattern": "TODO",
+      "scope": "src"
+    },
+    {
+      "pattern": "FIXME",
+      "scope": "src"
+    }
+  ],
+  "decisions": [
+    "M0 is documentation and audit only.",
+    "MCP remains supported.",
+    "Future CLI is CLI-first and one-shot before daemon/session features.",
+    "The cross-agent skill uses CLI first and MCP when configured.",
+    "New documentation avoids emoji."
+  ],
+  "test_bindings": [
+    {
+      "id": "M0.S1",
+      "name": "Project facts recorded",
+      "function": "grep_project_facts",
+      "command": "bash -lc 'rg -n \"serial-mcp-server|set_control_lines|MCP tools\" doc/project-info.md doc/requirements.md'"
+    },
+    {
+      "id": "M0.S2",
+      "name": "Baseline gates recorded",
+      "function": "grep_baseline_gates",
+      "command": "bash -lc 'rg -n \"cargo fmt|cargo clippy|cargo test|cargo doc\" doc/progress.md doc/dev.md'"
+    },
+    {
+      "id": "M0.S3",
+      "name": "Runtime private state ignored",
+      "function": "grep_private_state_ignore",
+      "command": "bash -lc 'rg -n \"doc/workflow/context-artifacts|doc/.hook-state.json\" .gitignore'"
+    },
+    {
+      "id": "M0.S4",
+      "name": "Tests pass",
+      "function": "cargo_test_locked",
+      "command": "cargo test --locked --all-targets --all-features"
+    },
+    {
+      "id": "M0.S5",
+      "name": "Diff check passes",
+      "function": "git_diff_check",
+      "command": "bash -lc 'git diff --check'"
+    }
+  ]
+}
