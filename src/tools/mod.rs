@@ -1,5 +1,5 @@
 //! MCP tool implementations
-//! 
+//!
 //! Serial communication MCP tools using rust-sdk standard patterns
 
 // Legacy implementations (keep for reference)

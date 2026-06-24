@@ -1,65 +1,68 @@
 //! Configuration management for the serial MCP server
-//! 
+//!
 //! This module provides comprehensive configuration handling including command line
 //! arguments, configuration files, validation, and logging setup.
 
+use crate::error::{ConfigError, Result, SerialError};
+use clap::{Args as ClapArgs, Parser, Subcommand, ValueEnum};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use clap::Parser;
-use crate::error::{SerialError, ConfigError, Result};
 
 /// Command line arguments
 #[derive(Parser, Debug)]
-#[command(name = "serial-mcp-rs")]
+#[command(name = "serial-mcp-server")]
 #[command(about = "A Model Context Protocol server for serial port communication")]
 #[command(version)]
 pub struct Args {
+    #[command(subcommand)]
+    pub command: Option<Command>,
+
     /// Path to configuration file
-    #[arg(short, long)]
+    #[arg(short, long, global = true)]
     pub config: Option<PathBuf>,
 
     /// Log level (error, warn, info, debug, trace)
-    #[arg(long, default_value = "info")]
-    pub log_level: String,
+    #[arg(long, global = true)]
+    pub log_level: Option<String>,
 
     /// Log file path
-    #[arg(long)]
+    #[arg(long, global = true)]
     pub log_file: Option<PathBuf>,
 
     /// Maximum number of concurrent connections
-    #[arg(long, default_value = "10")]
+    #[arg(long, default_value = "10", global = true)]
     pub max_connections: usize,
 
     /// Connection timeout in seconds
-    #[arg(long, default_value = "30")]
+    #[arg(long, default_value = "30", global = true)]
     pub connection_timeout: u64,
 
     /// Default baud rate for serial connections
-    #[arg(long, default_value = "115200")]
+    #[arg(long, default_value = "115200", global = true)]
     pub default_baud_rate: u32,
 
     /// Default timeout for operations in milliseconds
-    #[arg(long, default_value = "1000")]
+    #[arg(long, default_value = "1000", global = true)]
     pub default_timeout_ms: u64,
 
     /// Maximum buffer size in bytes
-    #[arg(long, default_value = "8192")]
+    #[arg(long, default_value = "8192", global = true)]
     pub max_buffer_size: usize,
 
     /// Connection retry count
-    #[arg(long, default_value = "3")]
+    #[arg(long, default_value = "3", global = true)]
     pub retry_count: u32,
 
     /// Enable auto-discovery of serial ports
-    #[arg(long)]
+    #[arg(long, global = true)]
     pub auto_discovery: bool,
 
     /// Allow multiple connections to the same port
-    #[arg(long)]
+    #[arg(long, global = true)]
     pub allow_port_sharing: bool,
 
     /// Restrict port access to specific patterns
-    #[arg(long)]
+    #[arg(long, global = true)]
     pub restrict_ports: bool,
 
     /// Generate default configuration file
@@ -75,8 +78,154 @@ pub struct Args {
     pub show_config: bool,
 }
 
+#[derive(Debug, Clone, Subcommand)]
+pub enum Command {
+    /// Start the MCP stdio server
+    Serve,
+    /// List available serial ports
+    ListPorts(OutputArgs),
+    /// Open and close a serial port to verify it is reachable
+    Probe(SerialPortArgs),
+    /// Write data to a serial port, optionally reading a response
+    Write(WriteCommand),
+    /// Read data from a serial port
+    Read(ReadCommand),
+    /// Set RTS and/or DTR control line levels
+    SetControlLines(SetControlLinesCommand),
+    /// Generate default configuration TOML
+    GenerateConfig,
+    /// Validate configuration and exit
+    ValidateConfig,
+    /// Show the merged configuration and exit
+    ShowConfig,
+}
+
+#[derive(Debug, Clone, ClapArgs)]
+pub struct OutputArgs {
+    /// Emit machine-readable JSON on stdout
+    #[arg(long)]
+    pub json: bool,
+}
+
+#[derive(Debug, Clone, ClapArgs)]
+pub struct SerialPortArgs {
+    /// Serial port path or name, such as COM19 or /dev/ttyUSB0
+    #[arg(long)]
+    pub port: String,
+
+    /// Baud rate
+    #[arg(long, default_value_t = 115200)]
+    pub baud: u32,
+
+    /// Data bits
+    #[arg(long, default_value_t = 8)]
+    pub data_bits: u8,
+
+    /// Stop bits: 1 or 2
+    #[arg(long, default_value = "1")]
+    pub stop_bits: String,
+
+    /// Parity: none, odd, or even
+    #[arg(long, default_value = "none")]
+    pub parity: String,
+
+    /// Flow control: none, software, or hardware
+    #[arg(long, default_value = "none")]
+    pub flow_control: String,
+
+    /// Emit machine-readable JSON on stdout
+    #[arg(long)]
+    pub json: bool,
+}
+
+#[derive(Debug, Clone, ClapArgs)]
+pub struct WriteCommand {
+    #[command(flatten)]
+    pub serial: SerialPortArgs,
+
+    /// Data to write
+    #[arg(long)]
+    pub data: String,
+
+    /// Data encoding
+    #[arg(long, value_enum, default_value_t = CliDataFormat::Utf8)]
+    pub format: CliDataFormat,
+
+    /// Read a response after writing
+    #[arg(long)]
+    pub read: bool,
+
+    /// Read timeout in milliseconds when --read is used
+    #[arg(long)]
+    pub timeout_ms: Option<u64>,
+
+    /// Maximum bytes to read when --read is used
+    #[arg(long, default_value_t = 1024)]
+    pub max_bytes: usize,
+}
+
+#[derive(Debug, Clone, ClapArgs)]
+pub struct ReadCommand {
+    #[command(flatten)]
+    pub serial: SerialPortArgs,
+
+    /// Data encoding for stdout payload
+    #[arg(long, value_enum, default_value_t = CliDataFormat::Utf8)]
+    pub format: CliDataFormat,
+
+    /// Read timeout in milliseconds
+    #[arg(long)]
+    pub timeout_ms: Option<u64>,
+
+    /// Maximum bytes to read
+    #[arg(long, default_value_t = 1024)]
+    pub max_bytes: usize,
+}
+
+#[derive(Debug, Clone, ClapArgs)]
+pub struct SetControlLinesCommand {
+    #[command(flatten)]
+    pub serial: SerialPortArgs,
+
+    /// RTS line level
+    #[arg(long, value_enum)]
+    pub rts: Option<ControlLineLevel>,
+
+    /// DTR line level
+    #[arg(long, value_enum)]
+    pub dtr: Option<ControlLineLevel>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, ValueEnum)]
+#[serde(rename_all = "lowercase")]
+pub enum CliDataFormat {
+    Utf8,
+    Hex,
+    Base64,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, ValueEnum)]
+#[serde(rename_all = "lowercase")]
+pub enum ControlLineLevel {
+    High,
+    Low,
+}
+
+impl ControlLineLevel {
+    pub fn as_bool(self) -> bool {
+        matches!(self, ControlLineLevel::High)
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ControlLineLevel::High => "high",
+            ControlLineLevel::Low => "low",
+        }
+    }
+}
+
 /// Main configuration structure
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct Config {
     pub server: ServerConfig,
     pub serial: SerialConfig,
@@ -84,23 +233,13 @@ pub struct Config {
     pub logging: LoggingConfig,
 }
 
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            server: ServerConfig::default(),
-            serial: SerialConfig::default(),
-            security: SecurityConfig::default(),
-            logging: LoggingConfig::default(),
-        }
-    }
-}
-
 impl Config {
     /// Load configuration from file or create default
     pub fn load(config_path: Option<&PathBuf>) -> Result<Self> {
         if let Some(path) = config_path {
-            let content = std::fs::read_to_string(path)
-                .map_err(|e| SerialError::InvalidConfig(format!("Failed to read config file: {}", e)))?;
+            let content = std::fs::read_to_string(path).map_err(|e| {
+                SerialError::InvalidConfig(format!("Failed to read config file: {}", e))
+            })?;
             let config: Config = toml::from_str(&content)
                 .map_err(|e| SerialError::InvalidConfig(format!("Invalid TOML syntax: {}", e)))?;
             config.validate()?;
@@ -121,7 +260,9 @@ impl Config {
         self.serial.auto_discovery = args.auto_discovery;
         self.serial.allow_port_sharing = args.allow_port_sharing;
         self.security.restrict_ports = args.restrict_ports;
-        self.logging.level = args.log_level.clone();
+        if let Some(log_level) = &args.log_level {
+            self.logging.level = log_level.clone();
+        }
         self.logging.file = args.log_file.clone();
     }
 
@@ -132,7 +273,8 @@ impl Config {
             return Err(ConfigError::InvalidValue {
                 field: "server.max_connections".to_string(),
                 value: "0".to_string(),
-            }.into());
+            }
+            .into());
         }
 
         if self.server.max_connections > 1000 {
@@ -141,7 +283,8 @@ impl Config {
                 value: self.server.max_connections.to_string(),
                 min: "1".to_string(),
                 max: "1000".to_string(),
-            }.into());
+            }
+            .into());
         }
 
         // Serial validation
@@ -149,31 +292,38 @@ impl Config {
             return Err(ConfigError::InvalidValue {
                 field: "serial.default_baud_rate".to_string(),
                 value: "0".to_string(),
-            }.into());
+            }
+            .into());
         }
 
-        let valid_baud_rates = [300, 600, 1200, 2400, 4800, 9600, 14400, 19200, 28800, 38400, 57600, 115200, 230400, 460800, 921600];
+        let valid_baud_rates = [
+            300, 600, 1200, 2400, 4800, 9600, 14400, 19200, 28800, 38400, 57600, 115200, 230400,
+            460800, 921600,
+        ];
         if !valid_baud_rates.contains(&self.serial.default_baud_rate) {
             return Err(ConfigError::InvalidValue {
                 field: "serial.default_baud_rate".to_string(),
                 value: self.serial.default_baud_rate.to_string(),
-            }.into());
+            }
+            .into());
         }
 
         if self.serial.max_buffer_size == 0 {
             return Err(ConfigError::InvalidValue {
                 field: "serial.max_buffer_size".to_string(),
                 value: "0".to_string(),
-            }.into());
+            }
+            .into());
         }
 
-        if self.serial.max_buffer_size > 1024 * 1024 {  // 1MB max
+        if self.serial.max_buffer_size > 1024 * 1024 {
             return Err(ConfigError::ValueOutOfRange {
                 field: "serial.max_buffer_size".to_string(),
                 value: self.serial.max_buffer_size.to_string(),
                 min: "1".to_string(),
                 max: "1048576".to_string(),
-            }.into());
+            }
+            .into());
         }
 
         // Logging validation
@@ -182,7 +332,8 @@ impl Config {
             return Err(ConfigError::InvalidValue {
                 field: "logging.level".to_string(),
                 value: self.logging.level.clone(),
-            }.into());
+            }
+            .into());
         }
 
         Ok(())
@@ -193,7 +344,6 @@ impl Config {
         toml::to_string_pretty(self)
             .map_err(|e| SerialError::InvalidConfig(format!("Failed to serialize config: {}", e)))
     }
-
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -272,7 +422,7 @@ impl Default for SecurityConfig {
             restrict_ports: false,
             allowed_ports: vec![],
             blocked_ports: vec![],
-            max_data_size: 65536,  // 64KB
+            max_data_size: 65536, // 64KB
             rate_limit_enabled: false,
             rate_limit_requests_per_second: 100,
             enable_authentication: false,
@@ -309,4 +459,3 @@ impl Default for LoggingConfig {
         }
     }
 }
-

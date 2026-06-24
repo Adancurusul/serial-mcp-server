@@ -2,123 +2,77 @@
 
 ![STM32G4 Development Board](img/stm32g4.jpg)
 
-A comprehensive example demonstrating serial communication using the MCP serial server with real STM32 hardware.
-
-## What This Demo Shows
-
-This example demonstrates:
-- **📡 Serial Communication**: Interactive command interface over USART
-- **🔧 Hardware Control**: LED control and status monitoring via serial commands  
-- **🧪 Complete MCP Testing**: Validates the 5 core MCP data-path tools with real hardware
-- **📊 Interactive Interface**: Send commands to running firmware and get real-time responses
+This example firmware provides an interactive USART command interface for testing `serial-mcp-server` with real STM32 hardware.
 
 ## Hardware Requirements
 
-### Essential Hardware
-- **STM32 Development Board**: STM32 board with USART1 capability (PA9/PA10)
-- **USB-to-Serial Converter**: CH343 or similar (if board doesn't have built-in USB-UART)
-- **USB Cables**: For connecting to PC and powering the board
+- STM32 development board with USART1 on PA9/PA10, or equivalent firmware adaptation.
+- USB-to-serial adapter such as CH343, FTDI, CP2102, or a board-provided USB-UART.
+- Common ground between adapter and target board.
+- Voltage-compatible TX/RX levels.
+- LED on PB7 if you want the LED commands to show visible output.
 
-### Connection
-- Connect USART1 pins: PA9 (TX), PA10 (RX)
-- Connect USB-to-Serial converter to PC
-- Power the STM32 board
-- LED connected to PB7 (built-in LED on most boards)
+## Serial Configuration
 
-## Quick Demo
+| Setting | Value |
+| --- | --- |
+| Baud rate | 115200 |
+| Data bits | 8 |
+| Parity | None |
+| Stop bits | 1 |
+| Flow control | None |
 
-### 1. Build and Run the Firmware
+## Build And Run Firmware
+
 ```bash
 cd examples/STM32_demo
 cargo run --release
 ```
 
-### 2. Use with MCP Serial Server
-This demo is designed to work with the MCP serial server. The MCP server provides tools to:
-- Discover available serial ports
-- Open serial connections with proper configuration
-- Send interactive commands to the firmware
-- Receive and display responses
-- Properly close connections
-- Set RTS/DTR control lines when supported by the serial adapter
+## Firmware Commands
 
-### 3. What You'll See
-Once running, the demo provides:
-- **Welcome message** with available commands
-- **Interactive command interface** responding to user input
-- **LED control** with status feedback
-- **Counter functionality** with increment and reset
-- **Blink patterns** for visual feedback
+| Command | Behavior |
+| --- | --- |
+| `H` or `h` | Print help. |
+| `L` or `l` | Toggle LED state. |
+| `C` or `c` | Print and increment counter. |
+| `R` or `r` | Reset counter to zero. |
+| `B` or `b` | Blink LED three times. |
+| Other input | Echo the character. |
 
-## Serial Configuration
+## CLI Smoke
 
-- **Baud Rate**: 115200
-- **Data Bits**: 8
-- **Parity**: None
-- **Stop Bits**: 1
-- **Flow Control**: None
+From the repository root:
 
-## Interactive Commands
+```bash
+serial-mcp-server list-ports --json
+serial-mcp-server probe --port <port> --baud 115200 --json
+serial-mcp-server write --port <port> --baud 115200 --data H --read --timeout-ms 2000 --json
+```
 
-The firmware implements an interactive command interface:
+Use the port name reported by `list-ports`. On Windows this may look like `COM19`; on Linux or macOS it will usually be under `/dev`.
 
-| Command | Function | Response |
-|---------|----------|----------|
-| `H` or `h` | Display help | Complete command list |
-| `L` or `l` | Toggle LED state | "LED: ON" or "LED: OFF" |
-| `C` or `c` | Show counter (increments) | "Counter: X" |
-| `R` or `r` | Reset counter to 0 | "Counter reset to 0" |
-| `B` or `b` | Blink LED 3 times | "Blinking LED 3 times..." |
-| Other keys | Echo character | Character echoed back |
+## MCP Smoke
 
-## MCP Tools Testing
+Start the MCP server:
 
-This demo serves as a test platform for the 5 core MCP serial data tools:
+```bash
+serial-mcp-server serve
+```
 
-- **Port Discovery** (1 tool): `list_ports` - Find available serial ports
-- **Connection Management** (2 tools): `open`/`close` - Manage serial connections  
-- **Communication** (2 tools): `write`/`read` - Send commands and receive responses
-- **Control Lines** (1 tool): `set_control_lines` - Available in the server for adapters/devices that expose RTS/DTR
+Use the MCP client to run this sequence:
 
-**✅ Core data-path tools tested successfully with 100% success rate**
+1. `list_ports`
+2. `open` with baud rate `115200`
+3. `write` command `H`
+4. `read` with a timeout
+5. `set_control_lines` only if you intentionally want RTS/DTR changes
+6. `close`
 
-## Technical Features
+## Control-Line Caution
 
-### Serial Implementation
-- **Non-blocking USART**: Embassy-based async serial communication
-- **Command parsing**: Single character and multi-byte command support
-- **Real-time responses**: Immediate feedback for all commands
-- **State management**: LED state and counter persistence
+RTS and DTR behavior depends on adapter and board wiring. These lines can reset a board or put it into boot mode. Treat a successful `set_control_lines` response as software request evidence, not as electrical measurement evidence.
 
-### Performance Characteristics  
-- **Connection**: Reliable 115200 baud communication
-- **Command Response**: <50ms latency for most commands
-- **Throughput**: Sufficient for interactive debugging and control
-- **Stability**: Tested for extended operation periods
+## Evidence Boundaries
 
-## Documentation
-
-Detailed testing documentation available in `docs/`:
-
-- [Serial MCP Testing Results](docs/serial-mcp-testing-documentation.md) - Complete testing workflow and results
-
-## Getting Started
-
-### Prerequisites
-1. **Hardware Setup**: Connect your STM32 board and USB-to-serial converter
-2. **MCP Server**: Run the serial MCP server  
-3. **Build and Run Firmware**: Use `cargo run --release` to compile and run
-
-### Demo Features
-- **Interactive Commands**: Real-time command processing
-- **Hardware Control**: LED toggle and blink patterns
-- **Counter System**: Increment and reset functionality
-- **Help System**: Built-in command documentation
-
-This is a demonstration example showing the capabilities of serial communication with real embedded hardware using the MCP serial server.
-
----
-
-**Status: ✅ Hardware Validated - Real STM32 Testing on COM19**
-
-Perfect for demonstrating professional embedded development workflows with interactive serial communication.
+The historical COM19 test documentation in `docs/serial-mcp-testing-documentation.md` records one hardware setup. New release claims should be based on current command output from the device under test.

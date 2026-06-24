@@ -1,91 +1,94 @@
 # Serial MCP Server
 
-[![Rust](https://img.shields.io/badge/rust-1.70+-orange.svg)](https://rust-lang.org)
+[![Rust](https://img.shields.io/badge/rust-1.74+-orange.svg)](https://rust-lang.org)
 [![RMCP](https://img.shields.io/badge/RMCP-0.3.2-blue.svg)](https://github.com/modelcontextprotocol/rust-sdk)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-A professional Model Context Protocol (MCP) server for serial port communication. Provides AI assistants with comprehensive serial communication capabilities for embedded systems, IoT devices, and hardware debugging with real hardware integration.
+`serial-mcp-server` provides serial port access for AI workflows in two forms:
 
-> 📖 **Language Versions**: [English](README.md) | [中文](README_ZH.md)
+- MCP stdio server for clients that support MCP tools.
+- Scriptable CLI for direct use, CI, and agent skills without MCP setup.
 
-## ✨ Features
+Current release target: `0.2.0`.
 
-- 🚀 **Production Ready**: Real hardware integration with 6 comprehensive serial communication tools
-- 🔌 **Cross-Platform Support**: Windows, Linux, macOS with automatic port detection
-- 📡 **Complete Serial Control**: List ports, connect, send/receive data, close connections, and set RTS/DTR control lines
-- 📝 **Multiple Data Formats**: UTF-8, Hex, Binary encoding support with timeout handling
-- 🛠️ **Hardware Integration**: Tested with STM32, Arduino, ESP32 and other embedded systems
-- 🤖 **AI Integration**: Perfect compatibility with Claude and other AI assistants
-- 🧪 **Comprehensive Testing**: Core serial data tools validated with real hardware, with unit coverage for control-line argument handling
-- ⚡ **High Performance**: Built on Tokio async runtime with concurrent connection support
+Language versions: [English](README.md) | [Chinese](README_ZH.md)
 
-## 🏗️ Architecture
+## Requirements
 
-```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   MCP Client    │◄──►│  Serial MCP      │◄──►│  Serial Device  │
-│   (Claude/AI)   │    │  Server          │    │  Hardware       │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-                              │
-                              ▼
-                       ┌──────────────────┐
-                       │  Target Device   │
-                       │  (STM32/Arduino) │
-                       └──────────────────┘
-```
+- Rust 1.74 or newer.
+- A serial device or USB-to-serial adapter when running hardware operations.
+- Device drivers and OS permissions for the selected serial port.
 
-## 🚀 Quick Start
-
-### Prerequisites
-
-**Hardware Requirements:**
-- **Serial Device**: STM32, Arduino, ESP32, or any UART-compatible device
-- **Connection**: USB-to-Serial converter or built-in USB-UART
-- **USB Cables**: For connecting device to PC
-
-**Software Requirements:**
-- Rust 1.70+ 
-- Serial device drivers (automatically detected on most systems)
-
-### Installation
+## Install From Source
 
 ```bash
-# Clone and build from source
 git clone https://github.com/adancurusul/serial-mcp-server.git
 cd serial-mcp-server
 cargo build --release
 ```
 
-### Basic Usage
+The binary is built at:
 
-**Configure MCP Clients**
-
-#### Claude Desktop Configuration Example
-
-Add to Claude Desktop configuration file:
-
-**Windows Example:**
-```json
-{
-  "mcpServers": {
-    "serial": {
-      "command": "C:\\path\\to\\serial-mcp-server\\target\\release\\serial-mcp-server.exe",
-      "args": [],
-      "env": {
-        "RUST_LOG": "info"
-      }
-    }
-  }
-}
+```bash
+target/release/serial-mcp-server
 ```
 
-**macOS/Linux Example:**
+To install the CLI onto your `PATH` from a checkout:
+
+```bash
+cargo install --path . --locked
+```
+
+## CLI Usage
+
+Use the CLI when you want direct serial operations without an MCP client.
+
+```bash
+serial-mcp-server --help
+serial-mcp-server list-ports --json
+serial-mcp-server probe --port <port> --baud 115200 --json
+serial-mcp-server write --port <port> --baud 115200 --data H --read --timeout-ms 1000 --json
+serial-mcp-server read --port <port> --baud 115200 --timeout-ms 1000 --json
+serial-mcp-server set-control-lines --port <port> --rts high --dtr low --json
+```
+
+Configuration commands:
+
+```bash
+serial-mcp-server generate-config
+serial-mcp-server validate-config --config serial-mcp.toml
+serial-mcp-server show-config --config serial-mcp.toml
+```
+
+CLI output rules:
+
+- stdout is reserved for command data and JSON.
+- stderr is reserved for diagnostics.
+- `--json` output should be parseable by tools such as `jq`.
+- Nonzero exit codes indicate command failure.
+
+Supported CLI data formats are `utf8`, `hex`, and `base64`. Use `hex` or `base64` for binary payloads.
+
+## MCP Usage
+
+Use MCP when your client supports MCP tools and you want a long-running stdio server.
+
+Recommended server command:
+
+```bash
+serial-mcp-server serve
+```
+
+No-subcommand startup is retained as a compatibility path for existing MCP setups, but new configurations should use `serve`.
+
+Claude Desktop example for macOS/Linux:
+
 ```json
 {
   "mcpServers": {
     "serial": {
       "command": "/path/to/serial-mcp-server/target/release/serial-mcp-server",
-      "args": [],
+      "args": ["serve"],
       "env": {
         "RUST_LOG": "info"
       }
@@ -94,135 +97,101 @@ Add to Claude Desktop configuration file:
 }
 ```
 
-Other examples for other tools like cursor, claude code etc. please refer to the corresponding tool documentation
+Windows example:
 
-## 🎯 Try the STM32 Demo
+```json
+{
+  "mcpServers": {
+    "serial": {
+      "command": "C:\\path\\to\\serial-mcp-server\\target\\release\\serial-mcp-server.exe",
+      "args": ["serve"],
+      "env": {
+        "RUST_LOG": "info"
+      }
+    }
+  }
+}
+```
 
-We provide a comprehensive **STM32 Serial Communication Demo** that showcases all capabilities:
+## MCP Tools
+
+| Tool | Purpose |
+| --- | --- |
+| `list_ports` | Discover available serial ports. |
+| `open` | Open a serial connection. |
+| `write` | Write UTF-8, hex, or base64 data to an open connection. |
+| `read` | Read data from an open connection with timeout handling. |
+| `close` | Close an open connection. |
+| `set_control_lines` | Set RTS and/or DTR on an open connection. |
+
+## Agent Skill
+
+The repository includes a Claude Code and Codex compatible skill at:
+
+```text
+skills/serial-debug/
+```
+
+The skill is CLI-first and documents MCP as an optional configured path. It is intended for agents that need to list ports, run serial smoke tests, control RTS/DTR, or troubleshoot UART/USB-serial devices.
+
+For local development, copy the skill folder into the agent skill roots:
 
 ```bash
-# Navigate to the example
-cd examples/STM32_demo
-
-# Build and run the firmware  
-cargo run --release
-
-# Use with MCP server for complete serial communication experience
+mkdir -p ~/.codex/skills ~/.claude/skills ~/.agents/skills
+cp -R skills/serial-debug ~/.codex/skills/
+cp -R skills/serial-debug ~/.claude/skills/
+cp -R skills/serial-debug ~/.agents/skills/
 ```
 
-**What the demo shows:**
-- ✅ **Interactive Serial Commands**: Send commands and get real-time responses
-- ✅ **Core MCP Tools**: Complete data-path validation with real STM32 hardware
-- ✅ **Hardware Control**: LED toggle, counter system, blink patterns
-- ✅ **Command Interface**: Help system with interactive command processing
+Tested explicit triggers:
 
-[📖 View STM32 Demo Documentation →](examples/STM32_demo/README.md)
-
-### Usage Examples with AI Assistants
-
-#### List Available Serial Ports
-```
-Please list available serial ports on the system
+```text
+Codex: Use $serial-debug
+Claude Code: /serial-debug
 ```
 
-#### Connect to Serial Device
+Claude Code `--bare` mode did not resolve `/serial-debug` in local testing; use normal Claude Code print or interactive mode for skill-trigger smoke tests.
+
+## Hardware Safety
+
+Serial commands can affect real hardware.
+
+- Confirm the selected port from `serial-mcp-server list-ports --json`.
+- Confirm voltage levels before connecting an adapter to a target board.
+- Confirm baud rate, data bits, parity, stop bits, and flow control before writing.
+- Treat RTS and DTR carefully. Many boards wire those lines to reset or boot mode.
+- Do not claim a write/read or RTS/DTR validation passed unless the command ran against a connected device.
+
+## STM32 Demo
+
+The STM32 demo is under:
+
+```text
+examples/STM32_demo/
 ```
-Connect to COM19 with baud rate 115200 for my STM32 device
+
+It provides firmware for an interactive serial command interface. See [examples/STM32_demo/README.md](examples/STM32_demo/README.md) for wiring, firmware commands, MCP usage, and CLI smoke commands.
+
+## Quality Gates
+
+Release work uses the checked-in `Cargo.lock` and these gates:
+
+```bash
+cargo fmt --all -- --check
+cargo clippy --locked --all-targets --all-features -- -D warnings
+cargo test --locked --all-targets --all-features
+cargo doc --locked --all-features --no-deps
 ```
 
-#### Send Interactive Commands
-```
-Send 'H' command to get help menu, then send 'L' to toggle the LED
-```
+CLI smoke:
 
-#### Read Device Responses
-```
-Read the response from the serial device with 2 second timeout
-```
-
-#### Complete Communication Test
-```
-Please help me test all 6 MCP serial tools with my STM32 board on COM19. Start by listing ports, then connect, send some commands, read responses, set DTR/RTS if supported by the adapter, and finally close the connection.
+```bash
+cargo run --locked -- --help
+cargo run --locked -- list-ports --json
+cargo run --locked -- write --help
+cargo run --locked -- set-control-lines --help
 ```
 
-## 🛠️ Complete Tool Set (6 Tools)
+## License
 
-Core data tools are tested and validated with real STM32 hardware:
-
-### 📡 Serial Communication (6 tools)
-| Tool | Description | Status |
-|------|-------------|----------|
-| `list_ports` | Discover available serial ports on system | ✅ Production Ready |
-| `open` | Open serial connection with configuration | ✅ Production Ready |
-| `write` | Send data to connected serial device | ✅ Production Ready |
-| `read` | Read data from serial device with timeout | ✅ Production Ready |
-| `close` | Close serial connection cleanly | ✅ Production Ready |
-| `set_control_lines` | Set RTS and/or DTR line levels on an open connection | ✅ Implemented |
-
-**✅ 6/6 Tools Available - Core data path validated with real hardware**
-
-## 🌍 Supported Hardware
-
-### Serial Devices
-- **STM32**: All STM32 series with UART capability  
-- **Arduino**: Uno, Nano, ESP32, ESP8266
-- **Embedded Systems**: Any device with UART/USB-Serial interface
-- **Industrial**: Modbus, RS485 converters
-- **IoT Devices**: Sensors, actuators with serial communication
-- **Other**: Any device with UART/USB-Serial interface
-
-### Serial Interfaces
-- **USB-to-Serial**: CH340, CH343, FTDI, CP2102
-- **Built-in USB**: STM32 with USB-CDC, Arduino Leonardo
-- **Hardware UART**: Direct UART connections
-
-### Platform Support
-
-| Platform | Port Format | Examples |
-|----------|-------------|----------|
-| Windows | `COMx` | COM1, COM3, COM19 |
-| Linux | `/dev/ttyXXX` | /dev/ttyUSB0, /dev/ttyACM0 |
-| macOS | `/dev/tty.xxx` | /dev/tty.usbserial-1234 |
-
-## 🏆 Production Status
-
-### ✅ Fully Implemented and Tested
-
-**Current Status: PRODUCTION READY**
-
-- ✅ **Complete Serial Integration**: Real hardware data communication plus RTS/DTR control-line operations
-- ✅ **Hardware Validation**: Tested with STM32 + CH343 USB-Serial on COM19
-- ✅ **Interactive Communication**: Full bidirectional command/response system
-- ✅ **Multi-Platform**: Windows, Linux, macOS support with automatic detection
-- ✅ **Connection Management**: Robust connection handling with proper cleanup
-- ✅ **AI Integration**: Perfect MCP protocol compatibility
-
-## 📦 Technical Features
-
-### Serial Implementation
-- **Cross-Platform**: Automatic port detection and configuration
-- **Multiple Encodings**: UTF-8, Hex, Binary data support
-- **Timeout Handling**: Configurable read/write timeouts
-- **Connection Pooling**: Multiple concurrent serial connections
-
-### Performance Characteristics
-- **Port Discovery**: Fast enumeration of available ports
-- **Connection Speed**: Rapid connection establishment
-- **Data Throughput**: Efficient data transfer with minimal latency
-- **Session Stability**: Tested for extended operation periods
-
-## 🙏 Acknowledgments
-
-Thanks to the following open source projects:
-
-- [serialport-rs](https://crates.io/crates/serialport) - Serial port communication library
-- [rmcp](https://github.com/modelcontextprotocol/rust-sdk) - Rust MCP SDK
-- [tokio](https://tokio.rs/) - Async runtime
-
-## 📄 License
-
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
----
-
-⭐ If this project helps you, please give us a Star!
+This project is licensed under the MIT License. See [LICENSE](LICENSE).
