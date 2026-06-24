@@ -30,40 +30,58 @@ pub struct Args {
     pub log_file: Option<PathBuf>,
 
     /// Maximum number of concurrent connections
-    #[arg(long, default_value = "10", global = true)]
-    pub max_connections: usize,
+    #[arg(long, global = true)]
+    pub max_connections: Option<usize>,
 
     /// Connection timeout in seconds
-    #[arg(long, default_value = "30", global = true)]
-    pub connection_timeout: u64,
+    #[arg(long, global = true)]
+    pub connection_timeout: Option<u64>,
 
     /// Default baud rate for serial connections
-    #[arg(long, default_value = "115200", global = true)]
-    pub default_baud_rate: u32,
+    #[arg(long, global = true)]
+    pub default_baud_rate: Option<u32>,
 
     /// Default timeout for operations in milliseconds
-    #[arg(long, default_value = "1000", global = true)]
-    pub default_timeout_ms: u64,
+    #[arg(long, global = true)]
+    pub default_timeout_ms: Option<u64>,
 
     /// Maximum buffer size in bytes
-    #[arg(long, default_value = "8192", global = true)]
-    pub max_buffer_size: usize,
+    #[arg(long, global = true)]
+    pub max_buffer_size: Option<usize>,
 
     /// Connection retry count
-    #[arg(long, default_value = "3", global = true)]
-    pub retry_count: u32,
+    #[arg(long, global = true)]
+    pub retry_count: Option<u32>,
 
     /// Enable auto-discovery of serial ports
-    #[arg(long, global = true)]
-    pub auto_discovery: bool,
+    #[arg(
+        long,
+        global = true,
+        num_args = 0..=1,
+        require_equals = true,
+        default_missing_value = "true"
+    )]
+    pub auto_discovery: Option<bool>,
 
     /// Allow multiple connections to the same port
-    #[arg(long, global = true)]
-    pub allow_port_sharing: bool,
+    #[arg(
+        long,
+        global = true,
+        num_args = 0..=1,
+        require_equals = true,
+        default_missing_value = "true"
+    )]
+    pub allow_port_sharing: Option<bool>,
 
     /// Restrict port access to specific patterns
-    #[arg(long, global = true)]
-    pub restrict_ports: bool,
+    #[arg(
+        long,
+        global = true,
+        num_args = 0..=1,
+        require_equals = true,
+        default_missing_value = "true"
+    )]
+    pub restrict_ports: Option<bool>,
 
     /// Generate default configuration file
     #[arg(long)]
@@ -114,24 +132,24 @@ pub struct SerialPortArgs {
     pub port: String,
 
     /// Baud rate
-    #[arg(long, default_value_t = 115200)]
-    pub baud: u32,
+    #[arg(long)]
+    pub baud: Option<u32>,
 
     /// Data bits
-    #[arg(long, default_value_t = 8)]
-    pub data_bits: u8,
+    #[arg(long)]
+    pub data_bits: Option<u8>,
 
     /// Stop bits: 1 or 2
-    #[arg(long, default_value = "1")]
-    pub stop_bits: String,
+    #[arg(long)]
+    pub stop_bits: Option<String>,
 
     /// Parity: none, odd, or even
-    #[arg(long, default_value = "none")]
-    pub parity: String,
+    #[arg(long)]
+    pub parity: Option<String>,
 
     /// Flow control: none, software, or hardware
-    #[arg(long, default_value = "none")]
-    pub flow_control: String,
+    #[arg(long)]
+    pub flow_control: Option<String>,
 
     /// Emit machine-readable JSON on stdout
     #[arg(long)]
@@ -251,19 +269,39 @@ impl Config {
 
     /// Merge command line arguments into configuration
     pub fn merge_args(&mut self, args: &Args) {
-        self.server.max_connections = args.max_connections;
-        self.server.connection_timeout_seconds = args.connection_timeout;
-        self.serial.default_baud_rate = args.default_baud_rate;
-        self.serial.default_timeout_ms = args.default_timeout_ms;
-        self.serial.max_buffer_size = args.max_buffer_size;
-        self.serial.retry_count = args.retry_count;
-        self.serial.auto_discovery = args.auto_discovery;
-        self.serial.allow_port_sharing = args.allow_port_sharing;
-        self.security.restrict_ports = args.restrict_ports;
+        if let Some(max_connections) = args.max_connections {
+            self.server.max_connections = max_connections;
+        }
+        if let Some(connection_timeout) = args.connection_timeout {
+            self.server.connection_timeout_seconds = connection_timeout;
+        }
+        if let Some(default_baud_rate) = args.default_baud_rate {
+            self.serial.default_baud_rate = default_baud_rate;
+        }
+        if let Some(default_timeout_ms) = args.default_timeout_ms {
+            self.serial.default_timeout_ms = default_timeout_ms;
+        }
+        if let Some(max_buffer_size) = args.max_buffer_size {
+            self.serial.max_buffer_size = max_buffer_size;
+        }
+        if let Some(retry_count) = args.retry_count {
+            self.serial.retry_count = retry_count;
+        }
+        if let Some(auto_discovery) = args.auto_discovery {
+            self.serial.auto_discovery = auto_discovery;
+        }
+        if let Some(allow_port_sharing) = args.allow_port_sharing {
+            self.serial.allow_port_sharing = allow_port_sharing;
+        }
+        if let Some(restrict_ports) = args.restrict_ports {
+            self.security.restrict_ports = restrict_ports;
+        }
         if let Some(log_level) = &args.log_level {
             self.logging.level = log_level.clone();
         }
-        self.logging.file = args.log_file.clone();
+        if let Some(log_file) = &args.log_file {
+            self.logging.file = Some(log_file.clone());
+        }
     }
 
     /// Validate configuration

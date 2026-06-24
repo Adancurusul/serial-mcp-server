@@ -2,7 +2,7 @@
 
 ## serial-mcp-server 0.2.0
 
-Status: release candidate for merge to `main`.
+Status: released.
 
 ### Scope
 
@@ -24,7 +24,7 @@ This release keeps the MCP stdio server and adds a scriptable CLI plus an agent 
 - New MCP client configurations should use `serve`.
 - Rust MSRV is now documented and enforced as 1.74.
 
-### Validation Required Before Tagging
+### Validation
 
 ```bash
 cargo fmt --all -- --check

@@ -166,8 +166,8 @@ mod tests {
         ]);
 
         assert_eq!(args.log_level.as_deref(), Some("debug"));
-        assert_eq!(args.max_connections, 20);
-        assert_eq!(args.default_baud_rate, 9600);
+        assert_eq!(args.max_connections, Some(20));
+        assert_eq!(args.default_baud_rate, Some(9600));
     }
 
     #[test]
@@ -204,12 +204,102 @@ mod tests {
         match args.command {
             Some(Command::Write(write)) => {
                 assert_eq!(write.serial.port, "COM19");
-                assert_eq!(write.serial.baud, 115200);
+                assert_eq!(write.serial.baud, Some(115200));
                 assert_eq!(write.data, "H");
                 assert!(write.read);
                 assert!(write.serial.json);
             }
             other => panic!("expected write command, got {:?}", other),
         }
+    }
+
+    #[test]
+    fn test_serial_subcommand_defaults_are_not_cli_overrides() {
+        let args = Args::parse_from([
+            "serial-mcp-server",
+            "write",
+            "--port",
+            "COM19",
+            "--data",
+            "H",
+            "--read",
+        ]);
+        match args.command {
+            Some(Command::Write(write)) => {
+                assert_eq!(write.serial.port, "COM19");
+                assert_eq!(write.serial.baud, None);
+                assert_eq!(write.serial.data_bits, None);
+                assert_eq!(write.serial.stop_bits, None);
+                assert_eq!(write.serial.parity, None);
+                assert_eq!(write.serial.flow_control, None);
+                assert_eq!(write.timeout_ms, None);
+            }
+            other => panic!("expected write command, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_merge_args_preserves_config_values_when_flags_absent() {
+        let args = Args::parse_from(["serial-mcp-server", "read", "--port", "COM19"]);
+        let mut config = Config::default();
+        config.server.max_connections = 42;
+        config.server.connection_timeout_seconds = 77;
+        config.serial.default_baud_rate = 9600;
+        config.serial.default_timeout_ms = 5000;
+        config.serial.max_buffer_size = 16384;
+        config.serial.retry_count = 9;
+        config.serial.auto_discovery = true;
+        config.serial.allow_port_sharing = true;
+        config.security.restrict_ports = true;
+        config.logging.file = Some("serial.log".into());
+
+        config.merge_args(&args);
+
+        assert_eq!(config.server.max_connections, 42);
+        assert_eq!(config.server.connection_timeout_seconds, 77);
+        assert_eq!(config.serial.default_baud_rate, 9600);
+        assert_eq!(config.serial.default_timeout_ms, 5000);
+        assert_eq!(config.serial.max_buffer_size, 16384);
+        assert_eq!(config.serial.retry_count, 9);
+        assert!(config.serial.auto_discovery);
+        assert!(config.serial.allow_port_sharing);
+        assert!(config.security.restrict_ports);
+        assert_eq!(config.logging.file, Some("serial.log".into()));
+    }
+
+    #[test]
+    fn test_merge_args_applies_explicit_global_flags() {
+        let args = Args::parse_from([
+            "serial-mcp-server",
+            "--max-connections",
+            "20",
+            "--connection-timeout",
+            "12",
+            "--default-baud-rate",
+            "57600",
+            "--default-timeout-ms",
+            "2500",
+            "--max-buffer-size",
+            "4096",
+            "--retry-count",
+            "5",
+            "--auto-discovery",
+            "--allow-port-sharing",
+            "--restrict-ports",
+            "list-ports",
+        ]);
+        let mut config = Config::default();
+
+        config.merge_args(&args);
+
+        assert_eq!(config.server.max_connections, 20);
+        assert_eq!(config.server.connection_timeout_seconds, 12);
+        assert_eq!(config.serial.default_baud_rate, 57600);
+        assert_eq!(config.serial.default_timeout_ms, 2500);
+        assert_eq!(config.serial.max_buffer_size, 4096);
+        assert_eq!(config.serial.retry_count, 5);
+        assert!(config.serial.auto_discovery);
+        assert!(config.serial.allow_port_sharing);
+        assert!(config.security.restrict_ports);
     }
 }
