@@ -14,10 +14,10 @@ use serde::Serialize;
 pub async fn run(command: Command, config: &Config) -> Result<()> {
     match command {
         Command::ListPorts(args) => list_ports(args.json),
-        Command::Probe(args) => probe(args).await,
+        Command::Probe(args) => probe(args, config).await,
         Command::Write(args) => write(args, config).await,
         Command::Read(args) => read(args, config).await,
-        Command::SetControlLines(args) => set_control_lines(args).await,
+        Command::SetControlLines(args) => set_control_lines(args, config).await,
         Command::Serve
         | Command::GenerateConfig
         | Command::ValidateConfig
@@ -49,9 +49,9 @@ fn list_ports(json: bool) -> Result<()> {
     Ok(())
 }
 
-async fn probe(args: SerialPortArgs) -> Result<()> {
+async fn probe(args: SerialPortArgs, app_config: &Config) -> Result<()> {
     let json = args.json;
-    let config = connection_config(&args)?;
+    let config = connection_config(&args, app_config)?;
     let connection = open_connection(config.clone()).await?;
     let status = connection.status().await;
     let output = ProbeOutput {
@@ -74,7 +74,9 @@ async fn probe(args: SerialPortArgs) -> Result<()> {
 
 async fn write(args: WriteCommand, config: &Config) -> Result<()> {
     let json = args.serial.json;
-    let connection = open_connection(connection_config(&args.serial)?).await?;
+    let connection_config = connection_config(&args.serial, config)?;
+    let baud_rate = connection_config.baud_rate;
+    let connection = open_connection(connection_config).await?;
     let format = args.format.as_data_format();
     let payload = DataConverter::decode(&args.data, format)?;
     let bytes_written = connection.write(&payload).await.map_err(map_serial_error)?;
@@ -93,7 +95,7 @@ async fn write(args: WriteCommand, config: &Config) -> Result<()> {
     };
     let output = WriteOutput {
         port: args.serial.port,
-        baud_rate: args.serial.baud,
+        baud_rate,
         bytes_written,
         read,
     };
@@ -113,7 +115,9 @@ async fn write(args: WriteCommand, config: &Config) -> Result<()> {
 
 async fn read(args: ReadCommand, config: &Config) -> Result<()> {
     let json = args.serial.json;
-    let connection = open_connection(connection_config(&args.serial)?).await?;
+    let connection_config = connection_config(&args.serial, config)?;
+    let baud_rate = connection_config.baud_rate;
+    let connection = open_connection(connection_config).await?;
     let read = read_from_connection(
         &connection,
         args.timeout_ms.unwrap_or(config.serial.default_timeout_ms),
@@ -123,7 +127,7 @@ async fn read(args: ReadCommand, config: &Config) -> Result<()> {
     .await?;
     let output = ReadOutput {
         port: args.serial.port,
-        baud_rate: args.serial.baud,
+        baud_rate,
         read,
     };
 
@@ -135,7 +139,7 @@ async fn read(args: ReadCommand, config: &Config) -> Result<()> {
     Ok(())
 }
 
-async fn set_control_lines(args: SetControlLinesCommand) -> Result<()> {
+async fn set_control_lines(args: SetControlLinesCommand, app_config: &Config) -> Result<()> {
     if args.rts.is_none() && args.dtr.is_none() {
         return Err(SerialError::InvalidConfig(
             "At least one of --rts or --dtr must be specified".to_string(),
@@ -143,7 +147,9 @@ async fn set_control_lines(args: SetControlLinesCommand) -> Result<()> {
     }
 
     let json = args.serial.json;
-    let connection = open_connection(connection_config(&args.serial)?).await?;
+    let connection_config = connection_config(&args.serial, app_config)?;
+    let baud_rate = connection_config.baud_rate;
+    let connection = open_connection(connection_config).await?;
     if let Some(rts) = args.rts {
         connection
             .set_rts(rts.as_bool())
@@ -159,7 +165,7 @@ async fn set_control_lines(args: SetControlLinesCommand) -> Result<()> {
 
     let output = ControlLinesOutput {
         port: args.serial.port,
-        baud_rate: args.serial.baud,
+        baud_rate,
         rts: args.rts.map(ControlLineLevel::as_str),
         dtr: args.dtr.map(ControlLineLevel::as_str),
     };
@@ -212,14 +218,27 @@ async fn open_connection(config: ConnectionConfig) -> Result<SerialConnection> {
         .map_err(map_serial_error)
 }
 
-fn connection_config(args: &SerialPortArgs) -> Result<ConnectionConfig> {
+fn connection_config(args: &SerialPortArgs, config: &Config) -> Result<ConnectionConfig> {
+    let stop_bits = args
+        .stop_bits
+        .as_deref()
+        .unwrap_or(&config.serial.default_stop_bits);
+    let parity = args
+        .parity
+        .as_deref()
+        .unwrap_or(&config.serial.default_parity);
+    let flow_control = args
+        .flow_control
+        .as_deref()
+        .unwrap_or(&config.serial.default_flow_control);
+
     Ok(ConnectionConfig {
         port: args.port.clone(),
-        baud_rate: args.baud,
-        data_bits: parse_data_bits(args.data_bits)?,
-        stop_bits: parse_stop_bits(&args.stop_bits)?,
-        parity: parse_parity(&args.parity)?,
-        flow_control: parse_flow_control(&args.flow_control)?,
+        baud_rate: args.baud.unwrap_or(config.serial.default_baud_rate),
+        data_bits: parse_data_bits(args.data_bits.unwrap_or(config.serial.default_data_bits))?,
+        stop_bits: parse_stop_bits(stop_bits)?,
+        parity: parse_parity(parity)?,
+        flow_control: parse_flow_control(flow_control)?,
     })
 }
 
