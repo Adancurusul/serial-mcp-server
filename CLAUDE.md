@@ -1,73 +1,88 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This repository provides a Rust MCP stdio server and one-shot CLI for serial port communication.
 
-## Build & Run Commands
+## Development Rules
+
+- Keep `main` releasable.
+- Prefer small, reviewable changes with matching tests and documentation.
+- Preserve CLI stdout for command data and JSON output. Send diagnostics to stderr.
+- Do not claim hardware validation unless a command was run against a real connected device and produced evidence.
+- Keep generated build output such as `target/` out of commits.
+
+## Quality Gates
 
 ```bash
-# Build release binary
+cargo fmt --all -- --check
+cargo clippy --locked --all-targets --all-features -- -D warnings
+cargo test --locked --all-targets --all-features
+cargo doc --locked --all-features --no-deps
+```
+
+## Build And Run
+
+```bash
 cargo build --release
-
-# Run the server directly (uses stdio transport for MCP)
-cargo run --release
-
-# Run tests
-cargo test
-
-# Run a specific test
-cargo test test_name
-
-# Generate default configuration file
-cargo run --release -- --generate-config
-
-# Validate configuration
-cargo run --release -- --validate-config
-
-# Show current configuration
-cargo run --release -- --show-config
-
-# Run with custom config file
-cargo run --release -- --config path/to/config.toml
-
-# Run with debug logging
-RUST_LOG=debug cargo run --release
+cargo run --locked -- --help
+cargo run --locked -- serve --help
+cargo run --locked -- list-ports --json
 ```
 
-## Architecture Overview
+MCP server mode:
 
-This is a Model Context Protocol (MCP) server for serial port communication, built with Rust using the `rmcp` SDK.
-
-### Core Components
-
-- **`src/main.rs`** - Entry point. Handles CLI argument parsing, logging initialization, and MCP server startup using stdio transport.
-
-- **`src/tools/serial_handler.rs`** - MCP tool handler implementing `ServerHandler` trait. Defines the 6 MCP tools (`list_ports`, `open`, `close`, `write`, `read`, `set_control_lines`) using the `#[tool]` macro from rmcp.
-
-- **`src/serial/mod.rs`** - `ConnectionManager` manages active serial connections using a thread-safe `HashMap<String, Arc<SerialConnection>>`. Handles connection lifecycle.
-
-- **`src/serial/connection.rs`** - `SerialConnection` wraps the actual serial port with async read/write operations using tokio-serial.
-
-- **`src/config.rs`** - Configuration system with CLI args (clap) and TOML file support. `Config` struct has nested configs: `ServerConfig`, `SerialConfig`, `SecurityConfig`, `LoggingConfig`.
-
-### Data Flow
-
-```
-MCP Client (AI)
-    → stdio transport
-    → SerialHandler (tool methods)
-    → ConnectionManager
-    → SerialConnection
-    → Physical serial device
+```bash
+cargo run --locked -- serve
 ```
 
-### Key Patterns
+No-subcommand startup remains compatible with old MCP stdio configurations, but new docs and client configs should use `serve`.
 
-- Tools are defined with `#[tool]` macro and registered via `#[tool_router]` on the handler impl
-- Connection IDs are UUIDs returned by `open` and required for `write`/`read`/`close`/`set_control_lines`
-- Data encoding supports utf8, hex, and base64 for read/write operations
-- RTS/DTR modem control lines can be set per open serial connection with `set_control_lines`
-- Async operations use tokio with `RwLock` for connection state
+Config commands:
 
-### STM32 Demo
+```bash
+cargo run --locked -- generate-config
+cargo run --locked -- validate-config --config path/to/config.toml
+cargo run --locked -- show-config --config path/to/config.toml
+```
 
-Located at `examples/STM32_demo/` - embedded firmware example for testing serial communication with real hardware.
+## CLI Surface
+
+The CLI is the preferred automation surface for scripts, CI, and skills:
+
+```bash
+serial-mcp-server list-ports --json
+serial-mcp-server probe --port <port> --baud 115200 --json
+serial-mcp-server write --port <port> --baud 115200 --data H --read --timeout-ms 1000 --json
+serial-mcp-server read --port <port> --baud 115200 --timeout-ms 1000 --json
+serial-mcp-server set-control-lines --port <port> --rts high --dtr low --json
+```
+
+stdout is data only. Diagnostics and logs go to stderr or a configured log file.
+
+## Architecture
+
+`serial-mcp-server` is a Rust MCP stdio server and one-shot CLI for serial port communication.
+
+- `src/main.rs`: argument parsing, logging setup, command dispatch, MCP server startup.
+- `src/config.rs`: clap arguments, subcommands, TOML config, validation.
+- `src/cli.rs`: one-shot CLI command execution.
+- `src/tools/serial_handler.rs`: MCP tool handler and six MCP tools.
+- `src/serial/**`: serial connection wrapper, connection manager, port listing.
+- `src/session/**`: session abstractions used by supporting APIs and tests.
+- `skills/serial-debug/**`: Codex and Claude Code compatible skill, CLI-first with MCP optional.
+
+## MCP Tool Model
+
+MCP tools:
+
+- `list_ports`
+- `open`
+- `write`
+- `read`
+- `close`
+- `set_control_lines`
+
+Connection IDs are returned by `open` and are required for `write`, `read`, `close`, and `set_control_lines`.
+
+## Hardware Notes
+
+RTS and DTR can be wired to reset or boot circuitry on development boards. Do not claim hardware validation unless a real command was run against a connected device and produced evidence.

@@ -1,13 +1,13 @@
 //! Serial session implementation
-//! 
+//!
 //! Defines the core session structure and state management for serial connections.
 
-use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use crate::error::{SerialError, Result};
+use crate::error::{Result, SerialError};
 use crate::serial::SerialConnection;
 use crate::utils::SessionIdGenerator;
 
@@ -75,7 +75,6 @@ impl Default for SessionConfig {
     }
 }
 
-
 /// Session statistics
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SessionStats {
@@ -117,25 +116,25 @@ impl SessionStats {
 pub struct SerialSession {
     /// Unique session identifier
     pub session_id: String,
-    
+
     /// Session configuration
     pub config: SessionConfig,
-    
+
     /// Current session state
     pub state: SessionState,
-    
+
     /// Session creation timestamp
     pub created_at: DateTime<Utc>,
-    
+
     /// Last access timestamp
     pub last_accessed: DateTime<Utc>,
-    
+
     /// Session statistics
     pub stats: SessionStats,
-    
-    /// Optional serial connection (wrapped in Arc<Mutex> for thread safety)
+
+    /// Optional serial connection (wrapped in `Arc<Mutex>` for thread safety)
     connection: Option<Arc<Mutex<SerialConnection>>>,
-    
+
     /// Current reconnection attempt count
     reconnect_attempts: u32,
 }
@@ -145,7 +144,7 @@ impl SerialSession {
     pub fn new(config: SessionConfig) -> Self {
         let session_id = SessionIdGenerator::generate();
         let now = Utc::now();
-        
+
         Self {
             session_id,
             config,
@@ -157,7 +156,6 @@ impl SerialSession {
             reconnect_attempts: 0,
         }
     }
-
 
     /// Get session ID
     pub fn id(&self) -> &str {
@@ -192,7 +190,9 @@ impl SerialSession {
     /// Set connection
     pub fn set_connection(&mut self, connection: SerialConnection) -> Result<()> {
         if matches!(self.state, SessionState::Closed) {
-            return Err(SerialError::InvalidSession("Cannot set connection on closed session".to_string()));
+            return Err(SerialError::InvalidSession(
+                "Cannot set connection on closed session".to_string(),
+            ));
         }
 
         self.connection = Some(Arc::new(Mutex::new(connection)));
@@ -262,19 +262,23 @@ impl SerialSession {
         self.state = SessionState::Closing;
         self.connection = None;
         self.touch();
-        
+
         // Final state
         self.state = SessionState::Closed;
     }
 
     /// Get session age in seconds
     pub fn age_seconds(&self) -> i64 {
-        Utc::now().signed_duration_since(self.created_at).num_seconds()
+        Utc::now()
+            .signed_duration_since(self.created_at)
+            .num_seconds()
     }
 
     /// Get seconds since last access
     pub fn idle_seconds(&self) -> i64 {
-        Utc::now().signed_duration_since(self.last_accessed).num_seconds()
+        Utc::now()
+            .signed_duration_since(self.last_accessed)
+            .num_seconds()
     }
 
     /// Check if session is idle for more than the specified duration
@@ -324,9 +328,9 @@ mod tests {
             port_name: "/dev/ttyUSB0".to_string(),
             ..Default::default()
         };
-        
+
         let session = SerialSession::new(config);
-        
+
         assert!(!session.id().is_empty());
         assert_eq!(session.port_name(), "/dev/ttyUSB0");
         assert!(matches!(session.state(), SessionState::Creating));
@@ -338,14 +342,14 @@ mod tests {
     fn test_session_state_transitions() {
         let config = SessionConfig::default();
         let mut session = SerialSession::new(config);
-        
+
         session.set_state(SessionState::Active);
         assert!(session.is_active());
-        
+
         session.set_error("Test error".to_string());
         assert!(matches!(session.state(), SessionState::Error(_)));
         assert!(!session.is_active());
-        
+
         session.close();
         assert!(matches!(session.state(), SessionState::Closed));
     }
@@ -354,14 +358,13 @@ mod tests {
     fn test_session_stats() {
         let config = SessionConfig::default();
         let mut session = SerialSession::new(config);
-        
+
         session.record_send(100);
         session.record_receive(50);
-        
+
         assert_eq!(session.stats.bytes_sent, 100);
         assert_eq!(session.stats.bytes_received, 50);
         assert_eq!(session.stats.messages_sent, 1);
         assert_eq!(session.stats.messages_received, 1);
     }
-
 }

@@ -1,11 +1,11 @@
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
 use tokio::time::timeout;
 use tokio_serial::{SerialPortBuilderExt, SerialStream};
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
 
 use super::error::SerialError;
 
@@ -99,10 +99,18 @@ pub struct ConnectionConfig {
     pub flow_control: FlowControl,
 }
 
-fn default_data_bits() -> DataBits { DataBits::Eight }
-fn default_stop_bits() -> StopBits { StopBits::One }
-fn default_parity() -> Parity { Parity::None }
-fn default_flow_control() -> FlowControl { FlowControl::None }
+fn default_data_bits() -> DataBits {
+    DataBits::Eight
+}
+fn default_stop_bits() -> StopBits {
+    StopBits::One
+}
+fn default_parity() -> Parity {
+    Parity::None
+}
+fn default_flow_control() -> FlowControl {
+    FlowControl::None
+}
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ConnectionStatus {
@@ -135,18 +143,19 @@ impl SerialConnection {
         if config.baud_rate == 0 || config.baud_rate > 4_000_000 {
             return Err(SerialError::InvalidBaudRate(config.baud_rate));
         }
-        
+
         // Build serial port
         let builder = tokio_serial::new(&config.port, config.baud_rate)
             .data_bits(config.data_bits.into())
             .stop_bits(config.stop_bits.into())
             .parity(config.parity.into())
             .flow_control(config.flow_control.into());
-        
+
         // Open the port
-        let stream = builder.open_native_async()
+        let stream = builder
+            .open_native_async()
             .map_err(|e| SerialError::ConnectionFailed(format!("{}: {}", config.port, e)))?;
-        
+
         Ok(Self {
             id: Uuid::new_v4().to_string(),
             config,
@@ -156,29 +165,33 @@ impl SerialConnection {
             bytes_received: Arc::new(Mutex::new(0)),
         })
     }
-    
+
     pub fn id(&self) -> &str {
         &self.id
     }
-    
+
     pub async fn write(&self, data: &[u8]) -> Result<usize, SerialError> {
         use tokio::io::AsyncWriteExt;
-        
+
         let mut stream = self.stream.lock().await;
         let written = stream.write(data).await?;
         stream.flush().await?;
-        
+
         let mut sent = self.bytes_sent.lock().await;
         *sent += written as u64;
-        
+
         Ok(written)
     }
-    
-    pub async fn read(&self, buffer: &mut [u8], timeout_ms: Option<u64>) -> Result<usize, SerialError> {
+
+    pub async fn read(
+        &self,
+        buffer: &mut [u8],
+        timeout_ms: Option<u64>,
+    ) -> Result<usize, SerialError> {
         use tokio::io::AsyncReadExt;
-        
+
         let mut stream = self.stream.lock().await;
-        
+
         let read_result = if let Some(ms) = timeout_ms {
             match timeout(Duration::from_millis(ms), stream.read(buffer)).await {
                 Ok(result) => result,
@@ -187,15 +200,15 @@ impl SerialConnection {
         } else {
             stream.read(buffer).await
         };
-        
+
         let bytes_read = read_result?;
-        
+
         let mut received = self.bytes_received.lock().await;
         *received += bytes_read as u64;
-        
+
         Ok(bytes_read)
     }
-    
+
     pub async fn status(&self) -> ConnectionStatus {
         ConnectionStatus {
             id: self.id.clone(),
@@ -211,7 +224,7 @@ impl SerialConnection {
             bytes_received: *self.bytes_received.lock().await,
         }
     }
-    
+
     pub async fn set_rts(&self, level: bool) -> Result<(), SerialError> {
         use serialport::SerialPort;
         let mut stream = self.stream.lock().await;
@@ -231,17 +244,18 @@ impl SerialConnection {
             if baud_rate == 0 || baud_rate > 4_000_000 {
                 return Err(SerialError::InvalidBaudRate(baud_rate));
             }
-            
+
             let stream = self.stream.lock().await;
             // Note: tokio-serial doesn't support runtime reconfiguration
             // This would require closing and reopening the port
             drop(stream);
-            
+
             return Err(SerialError::InvalidConfig(
-                "Runtime reconfiguration not supported. Please close and reopen the connection.".to_string()
+                "Runtime reconfiguration not supported. Please close and reopen the connection."
+                    .to_string(),
             ));
         }
-        
+
         Ok(())
     }
 }

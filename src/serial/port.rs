@@ -13,22 +13,19 @@ pub struct PortInfo {
 impl PortInfo {
     pub fn list_ports() -> Result<Vec<PortInfo>, serialport::Error> {
         let ports = available_ports()?;
-        
+
         Ok(ports
             .into_iter()
             .map(|port| {
                 let hardware_id = match &port.port_type {
                     SerialPortType::UsbPort(info) => {
-                        Some(format!(
-                            "USB VID:{:04X} PID:{:04X}",
-                            info.vid, info.pid
-                        ))
+                        Some(format!("USB VID:{:04X} PID:{:04X}", info.vid, info.pid))
                     }
                     SerialPortType::PciPort => Some("PCI".to_string()),
                     SerialPortType::BluetoothPort => Some("Bluetooth".to_string()),
                     SerialPortType::Unknown => None,
                 };
-                
+
                 PortInfo {
                     name: port.port_name.clone(),
                     description: get_port_description(&port),
@@ -46,7 +43,9 @@ fn get_port_description(port: &serialport::SerialPortInfo) -> String {
             format!(
                 "{} {}",
                 info.manufacturer.as_ref().unwrap_or(&"Unknown".to_string()),
-                info.product.as_ref().unwrap_or(&"USB Serial Device".to_string())
+                info.product
+                    .as_ref()
+                    .unwrap_or(&"USB Serial Device".to_string())
             )
         }
         SerialPortType::PciPort => "PCI Serial Port".to_string(),

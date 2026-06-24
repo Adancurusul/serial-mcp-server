@@ -1,0 +1,4 @@
+interface:
+  display_name: "Serial Debug"
+  short_description: "Serial CLI and MCP debugging"
+  default_prompt: "Use $serial-debug to list serial ports and run a CLI-first serial smoke test."

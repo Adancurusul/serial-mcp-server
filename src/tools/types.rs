@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize};
-use schemars::JsonSchema;
 use crate::serial::{ConnectionConfig, PortInfo};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 // 工具请求类型
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -22,10 +22,18 @@ pub struct OpenArgs {
     pub flow_control: String,
 }
 
-fn default_data_bits() -> String { "8".to_string() }
-fn default_stop_bits() -> String { "1".to_string() }
-fn default_parity() -> String { "none".to_string() }
-fn default_flow_control() -> String { "none".to_string() }
+fn default_data_bits() -> String {
+    "8".to_string()
+}
+fn default_stop_bits() -> String {
+    "1".to_string()
+}
+fn default_parity() -> String {
+    "none".to_string()
+}
+fn default_flow_control() -> String {
+    "none".to_string()
+}
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct CloseArgs {
@@ -40,7 +48,9 @@ pub struct WriteArgs {
     pub encoding: String,
 }
 
-fn default_encoding() -> String { "utf8".to_string() }
+fn default_encoding() -> String {
+    "utf8".to_string()
+}
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct ReadArgs {
@@ -53,7 +63,9 @@ pub struct ReadArgs {
     pub encoding: String,
 }
 
-fn default_max_bytes() -> usize { 1024 }
+fn default_max_bytes() -> usize {
+    1024
+}
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct SetControlLinesArgs {
@@ -140,23 +152,25 @@ pub struct StatusResponse {
 // 数据编码/解码工具函数
 pub fn encode_data(data: &[u8], encoding: &str) -> Result<String, String> {
     match encoding.to_lowercase().as_str() {
-        "utf8" | "utf-8" => String::from_utf8(data.to_vec())
-            .map_err(|e| format!("UTF-8 encoding error: {}", e)),
+        "utf8" | "utf-8" => {
+            String::from_utf8(data.to_vec()).map_err(|e| format!("UTF-8 encoding error: {}", e))
+        }
         "hex" => {
             let hex_string = hex::encode(data);
             // Add spaces between every two hex characters
-            let spaced_hex = hex_string.chars()
+            let spaced_hex = hex_string
+                .chars()
                 .collect::<Vec<char>>()
                 .chunks(2)
                 .map(|chunk| chunk.iter().collect::<String>())
                 .collect::<Vec<String>>()
                 .join(" ");
             Ok(spaced_hex)
-        },
+        }
         "base64" => {
-            use base64::{Engine, engine::general_purpose};
+            use base64::{engine::general_purpose, Engine};
             Ok(general_purpose::STANDARD.encode(data))
-        },
+        }
         _ => Err(format!("Unsupported encoding: {}", encoding)),
     }
 }
@@ -168,22 +182,23 @@ pub fn decode_data(data: &str, encoding: &str) -> Result<Vec<u8>, String> {
             // Remove spaces from hex string
             let clean_hex = data.replace(" ", "");
             hex::decode(clean_hex).map_err(|e| format!("Hex decoding error: {}", e))
-        },
+        }
         "base64" => {
-            use base64::{Engine, engine::general_purpose};
+            use base64::{engine::general_purpose, Engine};
             // Try with standard padding first, then with URL_SAFE_NO_PAD if that fails
-            general_purpose::STANDARD.decode(data)
+            general_purpose::STANDARD
+                .decode(data)
                 .or_else(|_| general_purpose::URL_SAFE_NO_PAD.decode(data))
                 .map_err(|e| format!("Base64 decoding error: {}", e))
-        },
+        }
         _ => Err(format!("Unsupported encoding: {}", encoding)),
     }
 }
 
 impl From<OpenArgs> for ConnectionConfig {
     fn from(args: OpenArgs) -> Self {
-        use crate::serial::{DataBits, StopBits, Parity, FlowControl};
-        
+        use crate::serial::{DataBits, FlowControl, Parity, StopBits};
+
         let data_bits = match args.data_bits.as_str() {
             "5" => DataBits::Five,
             "6" => DataBits::Six,
@@ -191,27 +206,27 @@ impl From<OpenArgs> for ConnectionConfig {
             "8" => DataBits::Eight,
             _ => DataBits::Eight,
         };
-        
+
         let stop_bits = match args.stop_bits.as_str() {
             "1" => StopBits::One,
             "2" => StopBits::Two,
             _ => StopBits::One,
         };
-        
+
         let parity = match args.parity.to_lowercase().as_str() {
             "none" => Parity::None,
             "odd" => Parity::Odd,
             "even" => Parity::Even,
             _ => Parity::None,
         };
-        
+
         let flow_control = match args.flow_control.to_lowercase().as_str() {
             "none" => FlowControl::None,
             "software" => FlowControl::Software,
             "hardware" => FlowControl::Hardware,
             _ => FlowControl::None,
         };
-        
+
         ConnectionConfig {
             port: args.port,
             baud_rate: args.baud_rate,

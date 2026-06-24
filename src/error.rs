@@ -1,5 +1,5 @@
 //! Error types for the serial MCP server
-//! 
+//!
 //! This module provides comprehensive error handling for all serial communication
 //! and MCP server operations, inspired by embedded-debugger-mcp's error design.
 
@@ -111,9 +111,6 @@ pub enum SerialError {
     // Internal and unexpected errors
     #[error("Internal error: {0}")]
     InternalError(String),
-
-    #[error("Not implemented: {0}")]
-    NotImplemented(String),
 }
 
 /// Result type alias for convenience
@@ -351,7 +348,7 @@ impl SerialError {
 
             SerialError::SerializationError(_) | SerialError::TomlError(_) => "serialization",
 
-            SerialError::InternalError(_) | SerialError::NotImplemented(_) => "internal",
+            SerialError::InternalError(_) => "internal",
         }
     }
 }

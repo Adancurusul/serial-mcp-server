@@ -11,10 +11,20 @@ pub use connection::{
 pub use error::SerialError as LocalSerialError;
 pub use port::PortInfo;
 
+use crate::error::SerialError;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use crate::error::SerialError;
+
+pub struct ConnectParams<'a> {
+    pub port_name: &'a str,
+    pub baud_rate: u32,
+    pub data_bits: u8,
+    pub stop_bits: &'a str,
+    pub parity: &'a str,
+    pub flow_control: &'a str,
+    pub timeout_ms: u64,
+}
 
 #[derive(Debug)]
 pub struct ConnectionManager {
@@ -31,54 +41,54 @@ impl ConnectionManager {
     /// Connect to a serial port with individual parameters (for compatibility with session manager)
     pub async fn connect(
         &self,
-        port_name: &str,
-        baud_rate: u32,
-        data_bits: u8,
-        stop_bits: &str,
-        parity: &str,
-        flow_control: &str,
-        _timeout_ms: u64,
+        params: ConnectParams<'_>,
     ) -> Result<SerialConnection, SerialError> {
-        use connection::{DataBits, StopBits, Parity, FlowControl};
+        use connection::{DataBits, FlowControl, Parity, StopBits};
 
-        let data_bits = match data_bits {
+        let data_bits = match params.data_bits {
             5 => DataBits::Five,
             6 => DataBits::Six,
             7 => DataBits::Seven,
             8 => DataBits::Eight,
-            _ => return Err(SerialError::InvalidDataBits(data_bits)),
+            _ => return Err(SerialError::InvalidDataBits(params.data_bits)),
         };
 
-        let stop_bits = match stop_bits.to_lowercase().as_str() {
+        let stop_bits = match params.stop_bits.to_lowercase().as_str() {
             "one" | "1" => StopBits::One,
             "two" | "2" => StopBits::Two,
-            _ => return Err(SerialError::InvalidStopBits(stop_bits.to_string())),
+            _ => return Err(SerialError::InvalidStopBits(params.stop_bits.to_string())),
         };
 
-        let parity = match parity.to_lowercase().as_str() {
+        let parity = match params.parity.to_lowercase().as_str() {
             "none" => Parity::None,
             "even" => Parity::Even,
             "odd" => Parity::Odd,
-            _ => return Err(SerialError::InvalidParity(parity.to_string())),
+            _ => return Err(SerialError::InvalidParity(params.parity.to_string())),
         };
 
-        let flow_control = match flow_control.to_lowercase().as_str() {
+        let flow_control = match params.flow_control.to_lowercase().as_str() {
             "none" => FlowControl::None,
             "software" => FlowControl::Software,
             "hardware" => FlowControl::Hardware,
-            _ => return Err(SerialError::InvalidFlowControl(flow_control.to_string())),
+            _ => {
+                return Err(SerialError::InvalidFlowControl(
+                    params.flow_control.to_string(),
+                ))
+            }
         };
 
         let config = ConnectionConfig {
-            port: port_name.to_string(),
-            baud_rate,
+            port: params.port_name.to_string(),
+            baud_rate: params.baud_rate,
             data_bits,
             stop_bits,
             parity,
             flow_control,
         };
 
-        SerialConnection::new(config).await.map_err(|e| SerialError::ConnectionFailed(e.to_string()))
+        SerialConnection::new(config)
+            .await
+            .map_err(|e| SerialError::ConnectionFailed(e.to_string()))
     }
 
     pub async fn open(&self, config: ConnectionConfig) -> Result<String, LocalSerialError> {
