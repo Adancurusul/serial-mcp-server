@@ -10,13 +10,13 @@ A professional Model Context Protocol (MCP) server for serial port communication
 
 ## ✨ Features
 
-- 🚀 **Production Ready**: Real hardware integration with 5 comprehensive serial communication tools
+- 🚀 **Production Ready**: Real hardware integration with 6 comprehensive serial communication tools
 - 🔌 **Cross-Platform Support**: Windows, Linux, macOS with automatic port detection
-- 📡 **Complete Serial Control**: List ports, connect, send/receive data with full configuration
+- 📡 **Complete Serial Control**: List ports, connect, send/receive data, close connections, and set RTS/DTR control lines
 - 📝 **Multiple Data Formats**: UTF-8, Hex, Binary encoding support with timeout handling
 - 🛠️ **Hardware Integration**: Tested with STM32, Arduino, ESP32 and other embedded systems
 - 🤖 **AI Integration**: Perfect compatibility with Claude and other AI assistants
-- 🧪 **Comprehensive Testing**: All 5 tools validated with real hardware 
+- 🧪 **Comprehensive Testing**: Core serial data tools validated with real hardware, with unit coverage for control-line argument handling
 - ⚡ **High Performance**: Built on Tokio async runtime with concurrent connection support
 
 ## 🏗️ Architecture
@@ -112,7 +112,7 @@ cargo run --release
 
 **What the demo shows:**
 - ✅ **Interactive Serial Commands**: Send commands and get real-time responses
-- ✅ **All 5 MCP Tools**: Complete validation with real STM32 hardware
+- ✅ **Core MCP Tools**: Complete data-path validation with real STM32 hardware
 - ✅ **Hardware Control**: LED toggle, counter system, blink patterns
 - ✅ **Command Interface**: Help system with interactive command processing
 
@@ -142,14 +142,14 @@ Read the response from the serial device with 2 second timeout
 
 #### Complete Communication Test
 ```
-Please help me test all 5 MCP serial tools with my STM32 board on COM19. Start by listing ports, then connect, send some commands, read responses, and finally close the connection.
+Please help me test all 6 MCP serial tools with my STM32 board on COM19. Start by listing ports, then connect, send some commands, read responses, set DTR/RTS if supported by the adapter, and finally close the connection.
 ```
 
-## 🛠️ Complete Tool Set (5 Tools)
+## 🛠️ Complete Tool Set (6 Tools)
 
-All tools tested and validated with real STM32 hardware:
+Core data tools are tested and validated with real STM32 hardware:
 
-### 📡 Serial Communication (5 tools)
+### 📡 Serial Communication (6 tools)
 | Tool | Description | Status |
 |------|-------------|----------|
 | `list_ports` | Discover available serial ports on system | ✅ Production Ready |
@@ -157,8 +157,9 @@ All tools tested and validated with real STM32 hardware:
 | `write` | Send data to connected serial device | ✅ Production Ready |
 | `read` | Read data from serial device with timeout | ✅ Production Ready |
 | `close` | Close serial connection cleanly | ✅ Production Ready |
+| `set_control_lines` | Set RTS and/or DTR line levels on an open connection | ✅ Implemented |
 
-**✅ 5/5 Tools - 100% Success Rate with Real Hardware**
+**✅ 6/6 Tools Available - Core data path validated with real hardware**
 
 ## 🌍 Supported Hardware
 
@@ -189,7 +190,7 @@ All tools tested and validated with real STM32 hardware:
 
 **Current Status: PRODUCTION READY**
 
-- ✅ **Complete Serial Integration**: Real hardware communication with all 5 tools
+- ✅ **Complete Serial Integration**: Real hardware data communication plus RTS/DTR control-line operations
 - ✅ **Hardware Validation**: Tested with STM32 + CH343 USB-Serial on COM19
 - ✅ **Interactive Communication**: Full bidirectional command/response system
 - ✅ **Multi-Platform**: Windows, Linux, macOS support with automatic detection

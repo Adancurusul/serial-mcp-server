@@ -9,7 +9,7 @@ A comprehensive example demonstrating serial communication using the MCP serial 
 This example demonstrates:
 - **📡 Serial Communication**: Interactive command interface over USART
 - **🔧 Hardware Control**: LED control and status monitoring via serial commands  
-- **🧪 Complete MCP Testing**: Validates all 5 MCP serial tools with real hardware
+- **🧪 Complete MCP Testing**: Validates the 5 core MCP data-path tools with real hardware
 - **📊 Interactive Interface**: Send commands to running firmware and get real-time responses
 
 ## Hardware Requirements
@@ -40,6 +40,7 @@ This demo is designed to work with the MCP serial server. The MCP server provide
 - Send interactive commands to the firmware
 - Receive and display responses
 - Properly close connections
+- Set RTS/DTR control lines when supported by the serial adapter
 
 ### 3. What You'll See
 Once running, the demo provides:
@@ -72,13 +73,14 @@ The firmware implements an interactive command interface:
 
 ## MCP Tools Testing
 
-This demo serves as a test platform for all 5 MCP serial tools:
+This demo serves as a test platform for the 5 core MCP serial data tools:
 
 - **Port Discovery** (1 tool): `list_ports` - Find available serial ports
 - **Connection Management** (2 tools): `open`/`close` - Manage serial connections  
 - **Communication** (2 tools): `write`/`read` - Send commands and receive responses
+- **Control Lines** (1 tool): `set_control_lines` - Available in the server for adapters/devices that expose RTS/DTR
 
-**✅ All 5 tools tested successfully with 100% success rate**
+**✅ Core data-path tools tested successfully with 100% success rate**
 
 ## Technical Features
 

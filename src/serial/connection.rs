@@ -212,6 +212,20 @@ impl SerialConnection {
         }
     }
     
+    pub async fn set_rts(&self, level: bool) -> Result<(), SerialError> {
+        use serialport::SerialPort;
+        let mut stream = self.stream.lock().await;
+        stream.write_request_to_send(level)?;
+        Ok(())
+    }
+
+    pub async fn set_dtr(&self, level: bool) -> Result<(), SerialError> {
+        use serialport::SerialPort;
+        let mut stream = self.stream.lock().await;
+        stream.write_data_terminal_ready(level)?;
+        Ok(())
+    }
+
     pub async fn reconfigure(&self, new_baud_rate: Option<u32>) -> Result<(), SerialError> {
         if let Some(baud_rate) = new_baud_rate {
             if baud_rate == 0 || baud_rate > 4_000_000 {

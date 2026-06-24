@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use super::super::types::{decode_data, encode_data};
+    use super::super::types::{decode_data, encode_data, SetControlLinesArgs};
 
     #[test]
     fn test_decode_utf8() {
@@ -95,5 +95,46 @@ mod tests {
         let b64_encoded = encode_data(test_data, "base64").unwrap();
         let b64_decoded = decode_data(&b64_encoded, "base64").unwrap();
         assert_eq!(test_data, b64_decoded.as_slice());
+    }
+
+    #[test]
+    fn test_set_control_lines_requires_at_least_one_line() {
+        let args = SetControlLinesArgs {
+            connection_id: "conn-1".to_string(),
+            rts: None,
+            dtr: None,
+        };
+        assert!(!args.has_line_update());
+
+        let args = SetControlLinesArgs {
+            connection_id: "conn-1".to_string(),
+            rts: Some(true),
+            dtr: None,
+        };
+        assert!(args.has_line_update());
+
+        let args = SetControlLinesArgs {
+            connection_id: "conn-1".to_string(),
+            rts: None,
+            dtr: Some(false),
+        };
+        assert!(args.has_line_update());
+    }
+
+    #[test]
+    fn test_set_control_lines_deserializes_optional_lines() {
+        let args: SetControlLinesArgs =
+            serde_json::from_str(r#"{"connection_id":"conn-1"}"#).unwrap();
+        assert_eq!(args.connection_id, "conn-1");
+        assert_eq!(args.rts, None);
+        assert_eq!(args.dtr, None);
+        assert!(!args.has_line_update());
+
+        let args: SetControlLinesArgs =
+            serde_json::from_str(r#"{"connection_id":"conn-1","rts":true,"dtr":false}"#)
+                .unwrap();
+        assert_eq!(args.rts, Some(true));
+        assert_eq!(args.dtr, Some(false));
+        assert!(args.has_line_update());
     }
 }

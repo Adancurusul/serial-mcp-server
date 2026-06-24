@@ -163,6 +163,47 @@ impl SerialHandler {
         }
     }
 
+    #[tool(description = "Set RTS and/or DTR control line levels on a serial port connection")]
+    async fn set_control_lines(&self, Parameters(args): Parameters<SetControlLinesArgs>) -> Result<CallToolResult, McpError> {
+        debug!("Setting control lines on connection {}: rts={:?} dtr={:?}", args.connection_id, args.rts, args.dtr);
+
+        if !args.has_line_update() {
+            return Err(McpError::internal_error("At least one of 'rts' or 'dtr' must be specified".to_string(), None));
+        }
+
+        let connection = match self.connection_manager.get(&args.connection_id).await {
+            Ok(conn) => conn,
+            Err(e) => {
+                error!("Invalid connection ID {}: {}", args.connection_id, e);
+                return Err(McpError::internal_error(format!("Error: Connection ID {} not found", args.connection_id), None));
+            }
+        };
+
+        if let Some(rts) = args.rts {
+            if let Err(e) = connection.set_rts(rts).await {
+                error!("Failed to set RTS on connection {}: {}", args.connection_id, e);
+                return Err(McpError::internal_error(format!("Error: Failed to set RTS - {}", e), None));
+            }
+        }
+
+        if let Some(dtr) = args.dtr {
+            if let Err(e) = connection.set_dtr(dtr).await {
+                error!("Failed to set DTR on connection {}: {}", args.connection_id, e);
+                return Err(McpError::internal_error(format!("Error: Failed to set DTR - {}", e), None));
+            }
+        }
+
+        let mut parts = vec![format!("Control lines updated\nConnection ID: {}", args.connection_id)];
+        if let Some(rts) = args.rts {
+            parts.push(format!("RTS: {}", if rts { "high" } else { "low" }));
+        }
+        if let Some(dtr) = args.dtr {
+            parts.push(format!("DTR: {}", if dtr { "high" } else { "low" }));
+        }
+
+        Ok(CallToolResult::success(vec![Content::text(parts.join("\n"))]))
+    }
+
     #[tool(description = "Read data from a serial port connection")]
     async fn read(&self, Parameters(args): Parameters<ReadArgs>) -> Result<CallToolResult, McpError> {
         debug!("Reading from connection {} with timeout {:?}", args.connection_id, args.timeout_ms);
