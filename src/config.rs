@@ -4,7 +4,7 @@
 //! arguments, configuration files, validation, and logging setup.
 
 use crate::error::{ConfigError, Result, SerialError};
-use clap::{Args as ClapArgs, Parser, Subcommand, ValueEnum};
+use clap::{ArgAction, Args as ClapArgs, Parser, Subcommand, ValueEnum};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -110,6 +110,9 @@ pub enum Command {
     Read(ReadCommand),
     /// Set RTS and/or DTR control line levels
     SetControlLines(SetControlLinesCommand),
+    /// Validate, plan, and run JSON macro packs
+    #[command(subcommand)]
+    Macro(MacroCommand),
     /// Generate default configuration TOML
     GenerateConfig,
     /// Validate configuration and exit
@@ -212,6 +215,105 @@ pub struct SetControlLinesCommand {
     /// DTR line level
     #[arg(long, value_enum)]
     pub dtr: Option<ControlLineLevel>,
+}
+
+#[derive(Debug, Clone, Subcommand)]
+pub enum MacroCommand {
+    /// Validate a JSON macro pack
+    Validate(MacroFileCommand),
+    /// List macros and assemblies in a JSON macro pack
+    List(MacroFileCommand),
+    /// Expand a macro or assembly into a hardware-free plan
+    Plan(MacroPlanCommand),
+    /// Run a macro or assembly against real serial hardware, dry-run, or simulation
+    Run(MacroRunCommand),
+}
+
+#[derive(Debug, Clone, ClapArgs)]
+pub struct MacroFileCommand {
+    /// JSON macro pack file
+    #[arg(long)]
+    pub file: PathBuf,
+
+    /// Emit machine-readable JSON on stdout
+    #[arg(long)]
+    pub json: bool,
+}
+
+#[derive(Debug, Clone, ClapArgs)]
+pub struct MacroPlanCommand {
+    /// JSON macro pack file
+    #[arg(long)]
+    pub file: PathBuf,
+
+    /// Macro name to plan
+    #[arg(long = "macro", conflicts_with = "assembly")]
+    pub macro_name: Option<String>,
+
+    /// Assembly name to plan
+    #[arg(long, conflicts_with = "macro_name")]
+    pub assembly: Option<String>,
+
+    /// Emit machine-readable JSON on stdout
+    #[arg(long)]
+    pub json: bool,
+}
+
+#[derive(Debug, Clone, ClapArgs)]
+pub struct MacroRunCommand {
+    #[command(flatten)]
+    pub serial: OptionalSerialPortArgs,
+
+    /// JSON macro pack file
+    #[arg(long)]
+    pub file: PathBuf,
+
+    /// Macro name to run
+    #[arg(long = "macro", conflicts_with = "assembly")]
+    pub macro_name: Option<String>,
+
+    /// Assembly name to run
+    #[arg(long, conflicts_with = "macro_name")]
+    pub assembly: Option<String>,
+
+    /// Return the expanded plan without opening serial hardware
+    #[arg(long)]
+    pub dry_run: bool,
+
+    /// Simulated UTF-8 read chunk. Repeat for multiple reads.
+    #[arg(long = "simulate-read", action = ArgAction::Append)]
+    pub simulate_read: Vec<String>,
+
+    /// Emit machine-readable JSON on stdout
+    #[arg(long)]
+    pub json: bool,
+}
+
+#[derive(Debug, Clone, ClapArgs)]
+pub struct OptionalSerialPortArgs {
+    /// Serial port path or name, such as COM19 or /dev/ttyUSB0
+    #[arg(long)]
+    pub port: Option<String>,
+
+    /// Baud rate
+    #[arg(long)]
+    pub baud: Option<u32>,
+
+    /// Data bits
+    #[arg(long)]
+    pub data_bits: Option<u8>,
+
+    /// Stop bits: 1 or 2
+    #[arg(long)]
+    pub stop_bits: Option<String>,
+
+    /// Parity: none, odd, or even
+    #[arg(long)]
+    pub parity: Option<String>,
+
+    /// Flow control: none, software, or hardware
+    #[arg(long)]
+    pub flow_control: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, ValueEnum)]

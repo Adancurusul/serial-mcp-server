@@ -9,9 +9,37 @@
 - 面向 MCP 客户端的 stdio MCP 服务器。
 - 面向脚本、CI 和 agent skill 的直接 CLI，不需要先配置 MCP。
 
-当前发布目标：`0.2.0`。
+当前发布目标：`0.3.0`。
 
 语言版本：[English](README.md) | [中文](README_ZH.md)
+
+## 0.3.0 更新简报
+
+- 新增 JSON Macro DSL，用于可复用的串口自动化流程。
+- 新增 CLI macro 命令：`macro validate`、`macro list`、`macro plan`、`macro run`。
+- 新增 MCP macro 工具，支持运行时内存加载、列出、卸载、规划和运行 macro pack。
+- 新增无硬件 simulation，用于 macro 验证、规划和 executor smoke test。
+- 不提供独立 Quick API。Quick 风格用法应表达为 macro。
+
+## Macro 自动化
+
+当串口流程不只是一次 read 或 write 时，可以使用 macro。很多设备有时序要求：先发送一个命令，等待几毫秒，读取直到出现提示符或确认响应，再发送下一个命令。Macro pack 用 JSON 记录这个过程，让人、CLI 脚本或 AI agent 都可以先验证、查看计划、在无硬件时仿真，再在接入真实设备后运行。
+
+典型使用场景：
+
+- 设备启动、烧录、配置或 provisioning 流程，需要按顺序发送命令并插入 delay。
+- 协议握手，需要等待 `OK`、`READY`、`PONG`、提示符或其他特定响应。
+- 回归 smoke test，需要反复执行同一组串口步骤。
+- AI 辅助调试，需要 agent 先审查完整的 send/delay/expect 计划，再触碰真实硬件。
+
+v0.3 DSL 有意保持很小：
+
+- `send`：写入 UTF-8、hex 或 base64 字节。
+- `delay`：等待固定毫秒数。
+- `expect`：读取直到响应包含或等于期望字节。
+- `assembly`：把多个已命名 macro 组合成更长流程。
+
+AI agent 可以通过本 README、仓库内置的 `skills/serial-debug` skill、`serial-mcp-server macro --help`，或已配置 MCP server 时的 tool discovery 发现 macro 能力。不使用 MCP 的 agent 也可以直接走 CLI + skill 文档。
 
 ## 环境要求
 
@@ -51,6 +79,21 @@ serial-mcp-server write --port <port> --baud 115200 --data H --read --timeout-ms
 serial-mcp-server read --port <port> --baud 115200 --timeout-ms 1000 --json
 serial-mcp-server set-control-lines --port <port> --rts high --dtr low --json
 ```
+
+Macro 自动化命令：
+
+```bash
+serial-mcp-server macro validate --file examples/macros/ping.json --json
+serial-mcp-server macro list --file examples/macros/ping.json --json
+serial-mcp-server macro plan --file examples/macros/ping.json --macro ping --json
+serial-mcp-server macro run --file examples/macros/ping.json --macro ping --dry-run --json
+serial-mcp-server macro run --file examples/macros/ping.json --macro ping --simulate-read PONG --json
+serial-mcp-server macro run --file examples/macros/ping.json --macro ping --port <port> --baud 115200 --json
+```
+
+Macro pack 是 `schema_version` 为 `0.3` 的 JSON 文件。v0.3 支持 macro 内的 `send`、`delay`、`expect` 步骤，以及按名称调用 macro 的 assembly。`expect` 支持 `contains` 和 `equals`。
+
+Macro DSL 是受限 DSL，不执行 shell、JavaScript、Python、文件操作、循环、变量、if/else、Quick 命令或 RTS/DTR macro 步骤。
 
 配置命令：
 
@@ -123,6 +166,14 @@ Windows 示例：
 | `read` | 从已打开连接读取数据并处理超时。 |
 | `close` | 关闭已打开连接。 |
 | `set_control_lines` | 设置已打开连接的 RTS 和/或 DTR。 |
+| `macro_load` | 验证并把 inline macro pack 或 pack 文件路径加载到服务器内存 registry。 |
+| `macro_list` | 列出已加载的 macro pack、macro 和 assembly。 |
+| `macro_unload` | 从内存 registry 移除已加载的 macro pack。 |
+| `macro_plan` | 无硬件展开已加载、inline 或文件形式的 macro 或 assembly。 |
+| `macro_run` | 基于已有连接或显式 simulation 输入运行已加载 macro 或 assembly。 |
+| `macro_run_inline` | 不存入 registry，直接验证、规划并运行 inline macro pack。 |
+
+MCP macro registry 只在运行时保存在内存中。服务器重启会清空已加载 pack，服务器不会写入持久 macro 库。
 
 ## Agent Skill
 
@@ -132,7 +183,7 @@ Windows 示例：
 skills/serial-debug/
 ```
 
-该 skill 优先使用 CLI，并把 MCP 作为可选的已配置路径。适用于 agent 列出串口、运行串口 smoke test、控制 RTS/DTR 或排查 UART/USB 串口问题。
+该 skill 优先使用 CLI，并把 MCP 作为可选的已配置路径。适用于 agent 列出串口、运行串口 smoke test、运行 macro 自动化、控制 RTS/DTR 或排查 UART/USB 串口问题。
 
 本地开发时，可以把 skill 复制到 agent 的 skill 根目录：
 
@@ -190,6 +241,8 @@ cargo run --locked -- --help
 cargo run --locked -- list-ports --json
 cargo run --locked -- write --help
 cargo run --locked -- set-control-lines --help
+cargo run --locked -- macro validate --file examples/macros/ping.json --json
+cargo run --locked -- macro run --file examples/macros/ping.json --macro ping --simulate-read PONG --json
 ```
 
 ## 许可证

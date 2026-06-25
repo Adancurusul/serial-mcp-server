@@ -4,6 +4,7 @@
 
 use clap::Parser;
 use rmcp::{transport::stdio, ServiceExt};
+use std::ffi::OsString;
 use tracing::{debug, error, info};
 use tracing_subscriber::{fmt, EnvFilter};
 
@@ -17,7 +18,18 @@ use serial_mcp_server::{
 #[tokio::main]
 async fn main() -> Result<()> {
     // Parse command line arguments
-    let args = Args::parse();
+    let raw_args: Vec<OsString> = std::env::args_os().collect();
+    let args = match Args::try_parse_from(&raw_args) {
+        Ok(args) => args,
+        Err(error) => {
+            if is_macro_json_invocation(&raw_args) {
+                let message = error.to_string();
+                cli::print_macro_json_error(&message)?;
+                return Err(SerialError::InvalidConfig(message));
+            }
+            error.exit();
+        }
+    };
 
     let command = args.command.clone().unwrap_or(Command::Serve);
 
@@ -64,6 +76,13 @@ async fn main() -> Result<()> {
         Command::Serve => run_server(config).await,
         other => cli::run(other, &config).await,
     }
+}
+
+fn is_macro_json_invocation(raw_args: &[OsString]) -> bool {
+    let args = raw_args.iter().skip(1);
+    let has_macro = args.clone().any(|arg| arg == "macro");
+    let has_json = args.clone().any(|arg| arg == "--json");
+    has_macro && has_json
 }
 
 async fn run_server(config: Config) -> Result<()> {

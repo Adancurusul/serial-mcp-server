@@ -4,6 +4,7 @@
 //! Provides AI assistants with serial communication capabilities including
 //! port discovery, connection management, data transmission, and protocol handling.
 
+pub mod automation;
 pub mod cli;
 pub mod config;
 pub mod error;

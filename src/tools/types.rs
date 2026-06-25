@@ -1,3 +1,4 @@
+use crate::automation::MacroTarget;
 use crate::serial::{ConnectionConfig, PortInfo};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -91,6 +92,93 @@ pub struct ConfigureArgs {
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct StatusArgs {
     pub connection_id: String,
+}
+
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct MacroLoadArgs {
+    #[serde(default)]
+    pub pack_json: Option<String>,
+    #[serde(default)]
+    pub path: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct MacroListArgs {
+    #[serde(default)]
+    pub pack_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct MacroUnloadArgs {
+    pub pack_id: String,
+}
+
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct MacroTargetArgs {
+    pub kind: String,
+    pub name: String,
+}
+
+impl MacroTargetArgs {
+    pub fn macro_named(name: impl Into<String>) -> Self {
+        Self {
+            kind: "macro".to_string(),
+            name: name.into(),
+        }
+    }
+
+    pub fn assembly_named(name: impl Into<String>) -> Self {
+        Self {
+            kind: "assembly".to_string(),
+            name: name.into(),
+        }
+    }
+
+    pub fn into_target(self) -> Result<MacroTarget, String> {
+        match self.kind.as_str() {
+            "macro" => Ok(MacroTarget::macro_named(self.name)),
+            "assembly" => Ok(MacroTarget::assembly_named(self.name)),
+            other => Err(format!("Unsupported macro target kind: {}", other)),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct MacroPlanArgs {
+    #[serde(default)]
+    pub pack_id: Option<String>,
+    #[serde(default)]
+    pub pack_json: Option<String>,
+    #[serde(default)]
+    pub path: Option<String>,
+    pub target: MacroTargetArgs,
+}
+
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct MacroRunArgs {
+    pub pack_id: String,
+    pub target: MacroTargetArgs,
+    pub input: MacroRunInput,
+}
+
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct MacroRunInlineArgs {
+    pub pack_json: String,
+    pub target: MacroTargetArgs,
+    pub input: MacroRunInput,
+}
+
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(tag = "mode", rename_all = "snake_case")]
+pub enum MacroRunInput {
+    Connection { connection_id: String },
+    Simulation { reads: Vec<String> },
+}
+
+#[derive(Debug, Serialize)]
+pub struct MacroUnloadResponse {
+    pub pack_id: String,
+    pub unloaded: bool,
 }
 
 // 工具响应类型
