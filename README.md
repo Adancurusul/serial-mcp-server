@@ -21,6 +21,26 @@ Language versions: [English](README.md) | [Chinese](README_ZH.md)
 - Added explicit no-hardware simulation for macro validation, planning, and executor smoke tests.
 - Kept Quick out of the public API. Quick-style use cases should be represented as macros.
 
+## Macro Automation
+
+Use macros when a serial workflow is more than a single read or write. Many devices require a timed sequence: send a command, wait a few milliseconds, read until a prompt or acknowledgement appears, then send the next command. A macro pack records that procedure as JSON so a human, CLI script, or AI agent can validate it, inspect the plan, simulate it without hardware, and run it against a real port when a device is attached.
+
+Typical macro use cases:
+
+- Boot or provisioning flows that need ordered commands and delays.
+- Protocol handshakes that must wait for `OK`, `READY`, `PONG`, prompts, or other expected responses.
+- Regression smoke tests where the same serial procedure should run repeatedly.
+- AI-assisted debugging where the agent should review the full send/delay/expect plan before touching hardware.
+
+The v0.3 DSL is intentionally small:
+
+- `send`: write UTF-8, hex, or base64 bytes.
+- `delay`: wait for a fixed number of milliseconds.
+- `expect`: read until the response contains or equals expected bytes.
+- `assembly`: compose named macros into a longer workflow.
+
+AI agents can discover macro support from this README, from the bundled `skills/serial-debug` skill, by running `serial-mcp-server macro --help`, or through MCP tool discovery when the server is configured. Agents that do not use MCP can still use the CLI plus the skill docs.
+
 ## Requirements
 
 - Rust 1.74 or newer.
