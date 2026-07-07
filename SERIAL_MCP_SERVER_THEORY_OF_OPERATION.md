@@ -194,7 +194,7 @@ graph LR
 | `list_ports` | None | Enumerate available serial ports |
 | `open` | port, baud_rate, data_bits, stop_bits, parity, flow_control | Open a connection |
 | `write` | connection_id, data, encoding | Send data to device |
-| `read` | connection_id, timeout_ms, max_bytes, encoding | Receive data from device |
+| `read` | connection_id, timeout_ms, max_bytes, encoding, duration_ms, start_trigger, initial_timeout_ms, idle_timeout_ms | Receive data from device or collect a bounded capture window |
 | `close` | connection_id | Terminate connection |
 
 ---
@@ -342,15 +342,19 @@ sequenceDiagram
     participant Stream as SerialStream
     participant Device as Serial Device
 
-    Client->>Handler: read(connection_id, timeout_ms, max_bytes, encoding)
+    Client->>Handler: read(connection_id, timeout_ms, max_bytes, encoding, duration_ms?)
     Handler->>CM: get(connection_id)
 
     alt Connection found
         CM-->>Handler: Arc SerialConnection
-        Handler->>SC: read(buffer, timeout_ms)
+        alt duration_ms absent
+            Handler->>SC: read(buffer, timeout_ms)
+        else duration_ms present
+            Handler->>SC: capture(config)
+        end
         SC->>SC: Lock stream mutex
 
-        alt With timeout
+        alt Single read with timeout
             SC->>SC: tokio time timeout(duration, read)
 
             alt Data available before timeout
@@ -363,11 +367,23 @@ sequenceDiagram
                 SC-->>Handler: ReadTimeout error
                 Handler-->>Client: Timeout response (not error)
             end
-        else No timeout
+        else Single read without timeout
             Stream->>Device: RX request (blocking)
             Device-->>Stream: bytes
             Stream-->>SC: bytes_read
             SC-->>Handler: buffer slice
+        else Capture window
+            alt start_trigger is first_byte
+                SC->>SC: wait up to initial_timeout_ms for first bytes
+            else start_trigger is immediate
+                SC->>SC: start duration clock immediately
+            end
+            loop until duration, idle timeout, or max bytes
+                SC->>SC: timed serial read
+                Device-->>Stream: bytes or timeout
+                SC->>SC: append chunk metadata
+            end
+            SC-->>Handler: combined buffer and capture metadata
         end
 
         Handler->>Handler: encode_data(buffer, encoding)
@@ -811,6 +827,10 @@ graph TD
         RA_TO["timeout_ms: Option u64 - Optional"]
         RA_MAX["max_bytes: usize - Default: 1024"]
         RA_ENC["encoding: String - Default: utf8"]
+        RA_DUR["duration_ms: Option u64 - Enables capture"]
+        RA_START["start_trigger: immediate | first_byte - Default: first_byte"]
+        RA_INIT["initial_timeout_ms: Option u64"]
+        RA_IDLE["idle_timeout_ms: Option u64"]
     end
 
     subgraph "CloseArgs"
@@ -937,6 +957,7 @@ sequenceDiagram
 | write | 1-5ms + baud delay | Depends on data size |
 | read (with data) | 1-5ms | If data available |
 | read (timeout) | timeout_ms | Blocking wait |
+| read (capture) | initial wait + duration_ms | Bounded by max_bytes and optional idle_timeout_ms |
 | close | sub-1ms | Resource cleanup |
 
 ### Resource Usage

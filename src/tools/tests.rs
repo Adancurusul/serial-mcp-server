@@ -1,4 +1,5 @@
-use super::types::{decode_data, encode_data, SetControlLinesArgs};
+use super::types::{decode_data, encode_data, ReadArgs, SetControlLinesArgs};
+use crate::serial::CaptureStartTrigger;
 
 #[test]
 fn test_decode_utf8() {
@@ -132,4 +133,39 @@ fn test_set_control_lines_deserializes_optional_lines() {
     assert_eq!(args.rts, Some(true));
     assert_eq!(args.dtr, Some(false));
     assert!(args.has_line_update());
+}
+
+#[test]
+fn test_read_args_deserialize_capture_window() {
+    let args: ReadArgs = serde_json::from_str(
+        r#"{
+            "connection_id": "conn-1",
+            "timeout_ms": 1000,
+            "max_bytes": 8192,
+            "encoding": "utf8",
+            "duration_ms": 5000,
+            "start_trigger": "first_byte",
+            "initial_timeout_ms": 30000,
+            "idle_timeout_ms": 1500
+        }"#,
+    )
+    .unwrap();
+
+    assert_eq!(args.connection_id, "conn-1");
+    assert_eq!(args.timeout_ms, Some(1000));
+    assert_eq!(args.max_bytes, 8192);
+    assert_eq!(args.duration_ms, Some(5000));
+    assert_eq!(args.start_trigger, CaptureStartTrigger::FirstByte);
+    assert_eq!(args.initial_timeout_ms, Some(30000));
+    assert_eq!(args.idle_timeout_ms, Some(1500));
+}
+
+#[test]
+fn test_read_args_default_start_trigger_is_first_byte() {
+    let args: ReadArgs = serde_json::from_str(r#"{"connection_id":"conn-1"}"#).unwrap();
+
+    assert_eq!(args.connection_id, "conn-1");
+    assert_eq!(args.max_bytes, 1024);
+    assert_eq!(args.start_trigger, CaptureStartTrigger::FirstByte);
+    assert_eq!(args.duration_ms, None);
 }

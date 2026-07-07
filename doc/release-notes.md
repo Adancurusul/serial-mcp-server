@@ -1,5 +1,30 @@
 # Release Notes
 
+## serial-mcp-server capture window draft
+
+Status: local task branch, not released.
+
+### Scope
+
+This change adds a bounded capture window to serial reads while preserving the
+existing single-read behavior when `duration_ms` is absent.
+
+### User-Facing Changes
+
+- `serial-mcp-server read` accepts `--duration-ms`,
+  `--start-trigger immediate|first-byte`, `--initial-timeout-ms`, and
+  `--idle-timeout-ms`.
+- `serial-mcp-server write --read` accepts the same capture options.
+- MCP `read` accepts `duration_ms`, `start_trigger`, `initial_timeout_ms`, and
+  `idle_timeout_ms`.
+- Capture responses include `completion_reason`, `waited_ms`, `elapsed_ms`, and
+  `chunks`.
+
+### Compatibility
+
+- Existing reads without `duration_ms` continue to perform one serial read.
+- `timeout_ms` remains a per-read wait timeout, not a total capture duration.
+
 ## serial-mcp-server 0.2.0
 
 Status: released.

@@ -1,0 +1,63 @@
+{
+  "task_id": "M1",
+  "decision": "PASS",
+  "timestamp": "2026-07-07T04:16:02Z",
+  "scenarios": [
+    {
+      "name": "Existing single read remains compatible",
+      "status": "PASS",
+      "evidence": "cargo test --locked; no-duration code path remains the existing single-read branch"
+    },
+    {
+      "name": "Immediate capture records a fixed window",
+      "status": "PASS",
+      "evidence": "serial::capture::tests::immediate_capture_continues_after_first_chunk"
+    },
+    {
+      "name": "First-byte capture waits before starting the window",
+      "status": "PASS",
+      "evidence": "serial::capture::tests::first_byte_mode_reports_initial_timeout_without_data"
+    },
+    {
+      "name": "Capture reports why it stopped",
+      "status": "PASS",
+      "evidence": "capture completion reason tests for duration_elapsed, initial_timeout, idle_timeout, and max_bytes"
+    },
+    {
+      "name": "Write-read supports capture windows",
+      "status": "PASS",
+      "evidence": "main::tests::test_write_read_capture_window_parsing and shared CLI read path"
+    }
+  ],
+  "test_results": [
+    {
+      "command": "cargo fmt --check",
+      "status": "PASS"
+    },
+    {
+      "command": "cargo clippy --locked --all-targets --all-features -- -D warnings",
+      "status": "PASS"
+    },
+    {
+      "command": "cargo test --locked",
+      "status": "PASS",
+      "summary": "43 lib tests, 9 main tests, 9 macro automation tests, and doc-tests passed"
+    },
+    {
+      "command": "cargo doc --locked --all-features --no-deps",
+      "status": "PASS"
+    },
+    {
+      "command": "cargo run --locked -- read --help",
+      "status": "PASS"
+    },
+    {
+      "command": "cargo run --locked -- write --help",
+      "status": "PASS"
+    }
+  ],
+  "manual_verification": [
+    "No physical serial hardware round-trip was run."
+  ]
+}
+

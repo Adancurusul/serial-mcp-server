@@ -7,6 +7,7 @@ use tokio::time::timeout;
 use tokio_serial::{SerialPortBuilderExt, SerialStream};
 use uuid::Uuid;
 
+use super::capture::{capture_with_reader, CaptureConfig, CaptureReader, CaptureReport};
 use super::error::SerialError;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -207,6 +208,39 @@ impl SerialConnection {
         *received += bytes_read as u64;
 
         Ok(bytes_read)
+    }
+
+    pub async fn capture(&self, config: CaptureConfig) -> Result<CaptureReport, SerialError> {
+        use tokio::io::AsyncReadExt;
+
+        struct StreamCaptureReader<'a> {
+            stream: &'a mut SerialStream,
+        }
+
+        #[async_trait::async_trait]
+        impl CaptureReader for StreamCaptureReader<'_> {
+            async fn read_once(
+                &mut self,
+                buffer: &mut [u8],
+                timeout_ms: u64,
+            ) -> Result<usize, SerialError> {
+                match timeout(Duration::from_millis(timeout_ms), self.stream.read(buffer)).await {
+                    Ok(result) => result.map_err(SerialError::from),
+                    Err(_) => Err(SerialError::ReadTimeout),
+                }
+            }
+        }
+
+        let mut stream = self.stream.lock().await;
+        let mut reader = StreamCaptureReader {
+            stream: &mut stream,
+        };
+        let report = capture_with_reader(&mut reader, config).await?;
+
+        let mut received = self.bytes_received.lock().await;
+        *received += report.bytes_read() as u64;
+
+        Ok(report)
     }
 
     pub async fn status(&self) -> ConnectionStatus {

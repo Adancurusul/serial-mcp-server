@@ -77,7 +77,46 @@ serial-mcp-server list-ports --json
 serial-mcp-server probe --port <port> --baud 115200 --json
 serial-mcp-server write --port <port> --baud 115200 --data H --read --timeout-ms 1000 --json
 serial-mcp-server read --port <port> --baud 115200 --timeout-ms 1000 --json
+serial-mcp-server read --port <port> --baud 115200 --duration-ms 5000 --initial-timeout-ms 30000 --idle-timeout-ms 1500 --json
 serial-mcp-server set-control-lines --port <port> --rts high --dtr low --json
+```
+
+### Capture Window Reads
+
+`timeout-ms` keeps its original one-read meaning: wait up to that many
+milliseconds for one read operation, then return as soon as bytes are available.
+
+Use `--duration-ms` when an AI or script needs one bounded collection window.
+Capture mode keeps reading internally and returns one combined response with
+`completion_reason`, `waited_ms`, `elapsed_ms`, and per-chunk metadata.
+
+```bash
+serial-mcp-server read --port <port> --baud 115200 \
+  --duration-ms 5000 \
+  --start-trigger first-byte \
+  --initial-timeout-ms 30000 \
+  --idle-timeout-ms 1500 \
+  --max-bytes 8192 \
+  --json
+```
+
+Capture options:
+
+- `--duration-ms`: collection window length after capture starts.
+- `--start-trigger first-byte`: wait for the first byte before starting the
+  duration clock. This is the default for capture mode.
+- `--start-trigger immediate`: start the duration clock when the command starts.
+- `--initial-timeout-ms`: maximum wait for the first byte in first-byte mode.
+  If omitted, the command uses `--timeout-ms`.
+- `--idle-timeout-ms`: stop after this many quiet milliseconds once capture has
+  started.
+- `--max-bytes`: hard cap on the combined response bytes.
+
+`write --read` accepts the same capture options after the write:
+
+```bash
+serial-mcp-server write --port <port> --baud 115200 --data RUN --read \
+  --duration-ms 5000 --initial-timeout-ms 30000 --json
 ```
 
 Macro automation commands:
@@ -163,7 +202,7 @@ Windows example:
 | `list_ports` | Discover available serial ports. |
 | `open` | Open a serial connection. |
 | `write` | Write UTF-8, hex, or base64 data to an open connection. |
-| `read` | Read data from an open connection with timeout handling. |
+| `read` | Read data from an open connection with timeout handling or a bounded capture window. |
 | `close` | Close an open connection. |
 | `set_control_lines` | Set RTS and/or DTR on an open connection. |
 | `macro_load` | Validate and load an inline macro pack or pack file path into the server's in-memory registry. |
@@ -174,6 +213,25 @@ Windows example:
 | `macro_run_inline` | Validate, plan, and run an inline macro pack without storing it in the registry. |
 
 The MCP macro registry is runtime-only. Restarting the server clears loaded packs, and the server does not write a persistent macro library.
+
+MCP `read` accepts these optional capture fields in addition to
+`connection_id`, `timeout_ms`, `max_bytes`, and `encoding`:
+
+```json
+{
+  "connection_id": "...",
+  "duration_ms": 5000,
+  "start_trigger": "first_byte",
+  "initial_timeout_ms": 30000,
+  "idle_timeout_ms": 1500,
+  "max_bytes": 8192,
+  "encoding": "utf8"
+}
+```
+
+When `duration_ms` is absent, MCP `read` keeps the existing single-read
+behavior. When `duration_ms` is present, the tool returns structured JSON text
+with `completion_reason`, `waited_ms`, `elapsed_ms`, and `chunks`.
 
 ## Agent Skill
 

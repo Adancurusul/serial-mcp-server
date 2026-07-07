@@ -4,6 +4,7 @@
 //! arguments, configuration files, validation, and logging setup.
 
 use crate::error::{ConfigError, Result, SerialError};
+use crate::serial::CaptureStartTrigger;
 use clap::{ArgAction, Args as ClapArgs, Parser, Subcommand, ValueEnum};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -183,6 +184,9 @@ pub struct WriteCommand {
     /// Maximum bytes to read when --read is used
     #[arg(long, default_value_t = 1024)]
     pub max_bytes: usize,
+
+    #[command(flatten)]
+    pub capture: CaptureWindowArgs,
 }
 
 #[derive(Debug, Clone, ClapArgs)]
@@ -201,6 +205,28 @@ pub struct ReadCommand {
     /// Maximum bytes to read
     #[arg(long, default_value_t = 1024)]
     pub max_bytes: usize,
+
+    #[command(flatten)]
+    pub capture: CaptureWindowArgs,
+}
+
+#[derive(Debug, Clone, ClapArgs)]
+pub struct CaptureWindowArgs {
+    /// Collect data for this many milliseconds instead of returning after one read
+    #[arg(long)]
+    pub duration_ms: Option<u64>,
+
+    /// When a capture window starts
+    #[arg(long, value_enum, default_value_t = CaptureStartTrigger::FirstByte)]
+    pub start_trigger: CaptureStartTrigger,
+
+    /// Maximum milliseconds to wait for the first byte in first-byte mode
+    #[arg(long)]
+    pub initial_timeout_ms: Option<u64>,
+
+    /// Stop capture after this many quiet milliseconds once data has arrived
+    #[arg(long)]
+    pub idle_timeout_ms: Option<u64>,
 }
 
 #[derive(Debug, Clone, ClapArgs)]

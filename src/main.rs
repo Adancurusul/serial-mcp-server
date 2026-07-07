@@ -233,6 +233,68 @@ mod tests {
     }
 
     #[test]
+    fn test_read_capture_window_parsing() {
+        let args = Args::parse_from([
+            "serial-mcp-server",
+            "read",
+            "--port",
+            "COM19",
+            "--duration-ms",
+            "5000",
+            "--start-trigger",
+            "first-byte",
+            "--initial-timeout-ms",
+            "30000",
+            "--idle-timeout-ms",
+            "1500",
+            "--max-bytes",
+            "8192",
+        ]);
+        match args.command {
+            Some(Command::Read(read)) => {
+                assert_eq!(read.serial.port, "COM19");
+                assert_eq!(read.capture.duration_ms, Some(5000));
+                assert_eq!(
+                    read.capture.start_trigger,
+                    serial_mcp_server::serial::CaptureStartTrigger::FirstByte
+                );
+                assert_eq!(read.capture.initial_timeout_ms, Some(30000));
+                assert_eq!(read.capture.idle_timeout_ms, Some(1500));
+                assert_eq!(read.max_bytes, 8192);
+            }
+            other => panic!("expected read command, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_write_read_capture_window_parsing() {
+        let args = Args::parse_from([
+            "serial-mcp-server",
+            "write",
+            "--port",
+            "COM19",
+            "--data",
+            "RUN",
+            "--read",
+            "--duration-ms",
+            "5000",
+            "--start-trigger",
+            "immediate",
+        ]);
+        match args.command {
+            Some(Command::Write(write)) => {
+                assert!(write.read);
+                assert_eq!(write.capture.duration_ms, Some(5000));
+                assert_eq!(
+                    write.capture.start_trigger,
+                    serial_mcp_server::serial::CaptureStartTrigger::Immediate
+                );
+            }
+            other => panic!("expected write command, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn test_serial_subcommand_defaults_are_not_cli_overrides() {
         let args = Args::parse_from([
             "serial-mcp-server",

@@ -1,5 +1,7 @@
 use crate::automation::MacroTarget;
-use crate::serial::{ConnectionConfig, PortInfo};
+use crate::serial::{
+    CaptureChunk, CaptureCompletionReason, CaptureStartTrigger, ConnectionConfig, PortInfo,
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -62,6 +64,14 @@ pub struct ReadArgs {
     pub max_bytes: usize,
     #[serde(default = "default_encoding")]
     pub encoding: String,
+    #[serde(default)]
+    pub duration_ms: Option<u64>,
+    #[serde(default)]
+    pub start_trigger: CaptureStartTrigger,
+    #[serde(default)]
+    pub initial_timeout_ms: Option<u64>,
+    #[serde(default)]
+    pub idle_timeout_ms: Option<u64>,
 }
 
 fn default_max_bytes() -> usize {
@@ -216,6 +226,23 @@ pub struct ReadResponse {
     pub data: String,
     pub encoding: String,
     pub status: String,
+    pub timeout_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duration_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub start_trigger: Option<CaptureStartTrigger>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub initial_timeout_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub idle_timeout_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub waited_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub elapsed_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub completion_reason: Option<CaptureCompletionReason>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub chunks: Option<Vec<CaptureChunk>>,
 }
 
 #[derive(Debug, Serialize)]

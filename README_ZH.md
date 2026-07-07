@@ -77,7 +77,40 @@ serial-mcp-server list-ports --json
 serial-mcp-server probe --port <port> --baud 115200 --json
 serial-mcp-server write --port <port> --baud 115200 --data H --read --timeout-ms 1000 --json
 serial-mcp-server read --port <port> --baud 115200 --timeout-ms 1000 --json
+serial-mcp-server read --port <port> --baud 115200 --duration-ms 5000 --initial-timeout-ms 30000 --idle-timeout-ms 1500 --json
 serial-mcp-server set-control-lines --port <port> --rts high --dtr low --json
+```
+
+### 采集窗口读取
+
+`timeout-ms` 保持原有含义：等待一次 read 操作，收到第一批字节后立即返回。
+
+如果 AI 或脚本需要一次有边界的连续采集，使用 `--duration-ms`。采集模式会在服务器内部持续读取，并一次性返回合并数据、`completion_reason`、`waited_ms`、`elapsed_ms` 和每个 chunk 的元数据。
+
+```bash
+serial-mcp-server read --port <port> --baud 115200 \
+  --duration-ms 5000 \
+  --start-trigger first-byte \
+  --initial-timeout-ms 30000 \
+  --idle-timeout-ms 1500 \
+  --max-bytes 8192 \
+  --json
+```
+
+采集参数：
+
+- `--duration-ms`：采集开始后的窗口时长。
+- `--start-trigger first-byte`：先等待第一批数据，收到后才开始计算采集时长。这是采集模式默认值。
+- `--start-trigger immediate`：命令开始时就开始计算采集时长。
+- `--initial-timeout-ms`：first-byte 模式下最多等多久开始采集。不传时使用 `--timeout-ms`。
+- `--idle-timeout-ms`：采集开始后，连续空闲多久就提前停止。
+- `--max-bytes`：合并返回数据的硬上限。
+
+`write --read` 也支持同一组采集参数：
+
+```bash
+serial-mcp-server write --port <port> --baud 115200 --data RUN --read \
+  --duration-ms 5000 --initial-timeout-ms 30000 --json
 ```
 
 Macro 自动化命令：
@@ -163,7 +196,7 @@ Windows 示例：
 | `list_ports` | 发现可用串口。 |
 | `open` | 打开串口连接。 |
 | `write` | 向已打开连接写入 UTF-8、hex 或 base64 数据。 |
-| `read` | 从已打开连接读取数据并处理超时。 |
+| `read` | 从已打开连接读取数据，支持单次超时读取或有边界的采集窗口。 |
 | `close` | 关闭已打开连接。 |
 | `set_control_lines` | 设置已打开连接的 RTS 和/或 DTR。 |
 | `macro_load` | 验证并把 inline macro pack 或 pack 文件路径加载到服务器内存 registry。 |
@@ -174,6 +207,22 @@ Windows 示例：
 | `macro_run_inline` | 不存入 registry，直接验证、规划并运行 inline macro pack。 |
 
 MCP macro registry 只在运行时保存在内存中。服务器重启会清空已加载 pack，服务器不会写入持久 macro 库。
+
+MCP `read` 除了 `connection_id`、`timeout_ms`、`max_bytes` 和 `encoding`，还支持这些采集字段：
+
+```json
+{
+  "connection_id": "...",
+  "duration_ms": 5000,
+  "start_trigger": "first_byte",
+  "initial_timeout_ms": 30000,
+  "idle_timeout_ms": 1500,
+  "max_bytes": 8192,
+  "encoding": "utf8"
+}
+```
+
+不传 `duration_ms` 时，MCP `read` 保持原有单次读取行为。传入 `duration_ms` 后，工具返回结构化 JSON 文本，包含 `completion_reason`、`waited_ms`、`elapsed_ms` 和 `chunks`。
 
 ## Agent Skill
 
