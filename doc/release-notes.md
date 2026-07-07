@@ -41,9 +41,8 @@ The precise behavior to disclose is:
 - `idle_timeout_ms` and `max_bytes` keep capture bounded.
 - The response reports why collection stopped through `completion_reason`.
 
-Do not describe this as streaming, background recording, or unbounded logging.
-The implementation returns one combined response after the bounded capture
-window completes.
+This is a request/response capture API. The implementation returns one combined
+response after the bounded capture window completes.
 
 ### Validation
 
@@ -55,8 +54,10 @@ window completes.
   (`Espressif USB JTAG/serial debug unit`) at 115200 baud: PASS
 
 Hardware validation covered real read-only streaming, including one capture that
-stopped by `max_bytes` and one capture that stopped by `duration_elapsed`. No
-write command was run, and RTS/DTR behavior was not tested.
+stopped by `max_bytes` and one capture that stopped by `duration_elapsed`. The
+validated hardware scope is read-only serial capture; write/read command
+protocols and RTS/DTR control-line behavior remain outside this validation
+round.
 
 ## serial-mcp-server 0.2.0
 
@@ -96,4 +97,6 @@ cargo run --locked -- list-ports --json
 uv run --with pyyaml python /Users/adan/.codex/skills/.system/skill-creator/scripts/quick_validate.py skills/serial-debug
 ```
 
-Hardware validation is separate from software release gates. Do not claim a target board, RTS/DTR behavior, or write/read round trip is validated unless the command output was captured against that connected device.
+Hardware validation is separate from software release gates. Validation claims
+should reference command output captured against the connected device and should
+name the tested board, command path, and serial settings.

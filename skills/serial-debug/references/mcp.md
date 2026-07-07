@@ -52,5 +52,5 @@ MCP `read` keeps single-read behavior when `duration_ms` is absent. Add
 - Use MCP tool results as evidence only when the tool actually ran.
 - Close connections after smoke tests.
 - If an MCP client is not configured, switch to the CLI path and state that the CLI path was used.
-- Do not mix MCP connection ids with CLI one-shot commands; CLI commands open and close their own connections.
+- Keep MCP connection ids on the MCP path. CLI one-shot commands open and close their own connections.
 - For macro workflows, call `macro_plan` before `macro_run` when the user asks for reviewable automation steps.

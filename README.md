@@ -269,7 +269,7 @@ Serial commands can affect real hardware.
 - Confirm voltage levels before connecting an adapter to a target board.
 - Confirm baud rate, data bits, parity, stop bits, and flow control before writing.
 - Treat RTS and DTR carefully. Many boards wire those lines to reset or boot mode.
-- Do not claim a write/read or RTS/DTR validation passed unless the command ran against a connected device.
+- Validation claims should be based on command output from the connected device.
 
 ## STM32 Demo
 
