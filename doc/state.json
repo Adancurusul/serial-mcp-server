@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "task": {
+    "id": "M1",
+    "name": "serial-capture-window",
+    "description": "Add backward-compatible blocking capture windows to serial reads."
+  },
+  "current_phase": "dev",
+  "branch": "task/serial-capture-window",
+  "phases": {
+    "init": {
+      "status": "completed",
+      "verified": true,
+      "timestamp": "2026-07-07T04:07:53Z"
+    },
+    "design": {
+      "status": "completed",
+      "verified": true,
+      "timestamp": "2026-07-07T04:07:53Z"
+    },
+    "dev": {
+      "status": "in_progress",
+      "verified": false,
+      "timestamp": "2026-07-07T04:07:53Z"
+    },
+    "testing": {
+      "status": "pending",
+      "verified": false
+    },
+    "checkpoint": {
+      "status": "pending",
+      "verified": false
+    },
+    "task-done": {
+      "status": "pending",
+      "verified": false
+    }
+  },
+  "continue_remaining": 0,
+  "compact_context": null
+}
+
