@@ -19,7 +19,7 @@ use crate::automation::{
     SerialMacroTransport, SimulatedMacroTransport,
 };
 use crate::config::Config;
-use crate::serial::{ConnectionManager, PortInfo};
+use crate::serial::{CaptureConfig, ConnectionManager, PortInfo};
 
 /// Serial tool handler using rust-sdk standard patterns
 #[derive(Clone)]
@@ -438,6 +438,58 @@ impl SerialHandler {
 
         // Prepare buffer
         let mut buffer = vec![0u8; args.max_bytes];
+
+        if let Some(duration_ms) = args.duration_ms {
+            let timeout_ms = args
+                .timeout_ms
+                .unwrap_or(self.config.serial.default_timeout_ms);
+            let capture_config = CaptureConfig {
+                timeout_ms,
+                max_bytes: args.max_bytes,
+                duration_ms,
+                start_trigger: args.start_trigger,
+                initial_timeout_ms: args.initial_timeout_ms,
+                idle_timeout_ms: args.idle_timeout_ms,
+            };
+            capture_config.validate().map_err(mcp_error)?;
+
+            let report = connection
+                .capture(capture_config.clone())
+                .await
+                .map_err(|e| {
+                    error!(
+                        "Failed to capture from connection {}: {}",
+                        args.connection_id, e
+                    );
+                    McpError::internal_error(format!("Error: Data capture failed - {}", e), None)
+                })?;
+            let encoded = encode_data(&report.data, &args.encoding).map_err(|e| {
+                error!("Failed to encode capture data: {}", e);
+                McpError::internal_error(format!("Error: Data encoding failed - {}", e), None)
+            })?;
+            let response = ReadResponse {
+                connection_id: args.connection_id,
+                bytes_read: report.bytes_read(),
+                data: encoded,
+                encoding: args.encoding,
+                status: if report.bytes_read() > 0 {
+                    "ok".to_string()
+                } else {
+                    "timeout".to_string()
+                },
+                timeout_ms: Some(timeout_ms),
+                duration_ms: Some(capture_config.duration_ms),
+                start_trigger: Some(capture_config.start_trigger),
+                initial_timeout_ms: capture_config.initial_timeout_ms,
+                idle_timeout_ms: capture_config.idle_timeout_ms,
+                waited_ms: Some(report.waited_ms),
+                elapsed_ms: Some(report.elapsed_ms),
+                completion_reason: Some(report.completion_reason),
+                chunks: Some(report.chunks),
+            };
+
+            return tool_json(&response);
+        }
 
         // Read data
         match connection.read(&mut buffer, args.timeout_ms).await {

@@ -9,6 +9,7 @@ use crate::config::{
 };
 use crate::error::{Result, SerialError};
 use crate::serial::{
+    CaptureChunk, CaptureCompletionReason, CaptureConfig, CaptureReport, CaptureStartTrigger,
     ConnectionConfig, DataBits, FlowControl, LocalSerialError, Parity, PortInfo, SerialConnection,
     StopBits,
 };
@@ -246,9 +247,16 @@ async fn write(args: WriteCommand, config: &Config) -> Result<()> {
         Some(
             read_from_connection(
                 &connection,
-                args.timeout_ms.unwrap_or(config.serial.default_timeout_ms),
                 args.max_bytes,
                 format,
+                capture_config(
+                    args.timeout_ms.unwrap_or(config.serial.default_timeout_ms),
+                    args.max_bytes,
+                    args.capture.duration_ms,
+                    args.capture.start_trigger,
+                    args.capture.initial_timeout_ms,
+                    args.capture.idle_timeout_ms,
+                )?,
             )
             .await?,
         )
@@ -282,9 +290,16 @@ async fn read(args: ReadCommand, config: &Config) -> Result<()> {
     let connection = open_connection(connection_config).await?;
     let read = read_from_connection(
         &connection,
-        args.timeout_ms.unwrap_or(config.serial.default_timeout_ms),
         args.max_bytes,
         args.format.as_data_format(),
+        capture_config(
+            args.timeout_ms.unwrap_or(config.serial.default_timeout_ms),
+            args.max_bytes,
+            args.capture.duration_ms,
+            args.capture.start_trigger,
+            args.capture.initial_timeout_ms,
+            args.capture.idle_timeout_ms,
+        )?,
     )
     .await?;
     let output = ReadOutput {
@@ -349,29 +364,121 @@ async fn set_control_lines(args: SetControlLinesCommand, app_config: &Config) ->
 
 async fn read_from_connection(
     connection: &SerialConnection,
-    timeout_ms: u64,
     max_bytes: usize,
     format: DataFormat,
+    capture_config: ReadCaptureConfig,
 ) -> Result<ReadPayload> {
+    if let Some(config) = capture_config.capture {
+        let report = connection
+            .capture(config.clone())
+            .await
+            .map_err(map_serial_error)?;
+        return read_payload_from_capture(report, format, capture_config.timeout_ms, config);
+    }
+
     let mut buffer = vec![0_u8; max_bytes];
-    match connection.read(&mut buffer, Some(timeout_ms)).await {
+    match connection
+        .read(&mut buffer, Some(capture_config.timeout_ms))
+        .await
+    {
         Ok(bytes_read) => {
             buffer.truncate(bytes_read);
             Ok(ReadPayload {
                 bytes_read,
                 data: DataConverter::encode(&buffer, format)?,
                 status: "ok",
-                timeout_ms,
+                timeout_ms: capture_config.timeout_ms,
+                duration_ms: None,
+                start_trigger: None,
+                initial_timeout_ms: None,
+                idle_timeout_ms: None,
+                waited_ms: None,
+                elapsed_ms: None,
+                completion_reason: None,
+                chunks: None,
             })
         }
         Err(LocalSerialError::ReadTimeout) => Ok(ReadPayload {
             bytes_read: 0,
             data: String::new(),
             status: "timeout",
-            timeout_ms,
+            timeout_ms: capture_config.timeout_ms,
+            duration_ms: None,
+            start_trigger: None,
+            initial_timeout_ms: None,
+            idle_timeout_ms: None,
+            waited_ms: None,
+            elapsed_ms: None,
+            completion_reason: None,
+            chunks: None,
         }),
         Err(error) => Err(map_serial_error(error)),
     }
+}
+
+#[derive(Debug, Clone)]
+struct ReadCaptureConfig {
+    timeout_ms: u64,
+    capture: Option<CaptureConfig>,
+}
+
+fn capture_config(
+    timeout_ms: u64,
+    max_bytes: usize,
+    duration_ms: Option<u64>,
+    start_trigger: CaptureStartTrigger,
+    initial_timeout_ms: Option<u64>,
+    idle_timeout_ms: Option<u64>,
+) -> Result<ReadCaptureConfig> {
+    let Some(duration_ms) = duration_ms else {
+        return Ok(ReadCaptureConfig {
+            timeout_ms,
+            capture: None,
+        });
+    };
+
+    let capture = CaptureConfig {
+        timeout_ms,
+        max_bytes,
+        duration_ms,
+        start_trigger,
+        initial_timeout_ms,
+        idle_timeout_ms,
+    };
+    capture.validate().map_err(map_serial_error)?;
+
+    Ok(ReadCaptureConfig {
+        timeout_ms,
+        capture: Some(capture),
+    })
+}
+
+fn read_payload_from_capture(
+    report: CaptureReport,
+    format: DataFormat,
+    timeout_ms: u64,
+    config: CaptureConfig,
+) -> Result<ReadPayload> {
+    let status = if report.bytes_read() > 0 {
+        "ok"
+    } else {
+        "timeout"
+    };
+
+    Ok(ReadPayload {
+        bytes_read: report.bytes_read(),
+        data: DataConverter::encode(&report.data, format)?,
+        status,
+        timeout_ms,
+        duration_ms: Some(config.duration_ms),
+        start_trigger: Some(config.start_trigger),
+        initial_timeout_ms: config.initial_timeout_ms,
+        idle_timeout_ms: config.idle_timeout_ms,
+        waited_ms: Some(report.waited_ms),
+        elapsed_ms: Some(report.elapsed_ms),
+        completion_reason: Some(report.completion_reason),
+        chunks: Some(report.chunks),
+    })
 }
 
 async fn open_connection(config: ConnectionConfig) -> Result<SerialConnection> {
@@ -543,6 +650,22 @@ struct ReadPayload {
     data: String,
     status: &'static str,
     timeout_ms: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    duration_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    start_trigger: Option<CaptureStartTrigger>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    initial_timeout_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    idle_timeout_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    waited_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    elapsed_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    completion_reason: Option<CaptureCompletionReason>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    chunks: Option<Vec<CaptureChunk>>,
 }
 
 #[derive(Debug, Serialize)]

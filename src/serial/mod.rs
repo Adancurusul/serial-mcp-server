@@ -1,3 +1,4 @@
+pub mod capture;
 pub mod connection;
 pub mod error;
 pub mod port;
@@ -5,6 +6,9 @@ pub mod port;
 #[cfg(test)]
 mod tests;
 
+pub use capture::{
+    CaptureChunk, CaptureCompletionReason, CaptureConfig, CaptureReport, CaptureStartTrigger,
+};
 pub use connection::{
     ConnectionConfig, ConnectionStatus, DataBits, FlowControl, Parity, SerialConnection, StopBits,
 };

@@ -7,7 +7,7 @@ description: CLI-first serial port debugging and macro automation with serial-mc
 
 ## Operating Rule
 
-Use the `serial-mcp-server` CLI first unless the user explicitly asks for MCP or an MCP client is already configured. Keep stdout data separate from diagnostics, cite exact commands, and do not claim hardware success unless a real command touched the device and returned evidence.
+Use the `serial-mcp-server` CLI first unless the user explicitly asks for MCP or an MCP client is already configured. Keep stdout data separate from diagnostics, cite exact commands, and base hardware success on real command evidence from the device.
 
 ## Workflow
 
@@ -56,4 +56,4 @@ Macro packs are restricted JSON DSL files. v0.3 supports `send`, `delay`, `expec
 
 ## Reporting
 
-Report the command, exit status, and the relevant JSON or error excerpt. If no hardware is connected, say that only discovery/help paths were verified and mark device round-trip validation as manual.
+Report the command, exit status, and the relevant JSON or error excerpt. If no hardware is connected, limit the validation summary to discovery and help paths.

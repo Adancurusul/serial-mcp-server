@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Added bounded capture windows for CLI `read`, CLI `write --read`, and MCP
+  `read` using `duration_ms`, `start_trigger`, `initial_timeout_ms`, and
+  `idle_timeout_ms`.
+- Added capture response metadata: `completion_reason`, `waited_ms`,
+  `elapsed_ms`, and per-chunk byte offsets.
+
+### Changed
+
+- Preserved existing single-read behavior when `duration_ms` is not supplied.
+
 ## 0.3.0 - 2026-06-24
 
 ### Added

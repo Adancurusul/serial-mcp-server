@@ -5,7 +5,7 @@ Serial debugging can change device state. Be explicit about the port, baud rate,
 ## Checks Before Writing
 
 - Confirm the selected port name comes from `serial-mcp-server list-ports --json`.
-- Confirm voltage compatibility between the adapter and target board. Do not assume 5 V tolerance.
+- Confirm voltage compatibility between the adapter and target board, including 5 V tolerance.
 - Confirm the protocol baud rate, data bits, parity, stop bits, and flow control.
 - Avoid sending reset, erase, bootloader, or firmware-update commands unless the user requested that operation.
 
@@ -21,4 +21,4 @@ serial-mcp-server set-control-lines --port <port> --rts high --dtr low --json
 
 ## Evidence Boundaries
 
-If no device is connected, only report CLI availability and port discovery. Mark write/read, probe, and RTS/DTR behavior as manual hardware validation.
+If no device is connected, report CLI availability and port discovery as the verified scope. Hardware validation summaries should stay limited to commands that ran against a connected device.

@@ -10,6 +10,7 @@ serial-mcp-server list-ports --json
 serial-mcp-server probe --port <port> --baud 115200 --json
 serial-mcp-server write --port <port> --baud 115200 --data H --read --timeout-ms 1000 --json
 serial-mcp-server read --port <port> --baud 115200 --timeout-ms 1000 --json
+serial-mcp-server read --port <port> --baud 115200 --duration-ms 5000 --initial-timeout-ms 30000 --idle-timeout-ms 1500 --json
 serial-mcp-server set-control-lines --port <port> --rts high --dtr low --json
 serial-mcp-server macro validate --file <pack.json> --json
 serial-mcp-server macro list --file <pack.json> --json
@@ -37,6 +38,24 @@ The `write` and `read` commands support:
 - `--format base64`
 
 Use hex or base64 for binary-looking payloads. Use UTF-8 only when the protocol is text based.
+
+## Capture Windows
+
+`--timeout-ms` waits for one read operation. Use `--duration-ms` when you need
+one bounded capture window that continues after the first bytes arrive.
+
+```bash
+serial-mcp-server read --port <port> --baud 115200 \
+  --duration-ms 5000 \
+  --start-trigger first-byte \
+  --initial-timeout-ms 30000 \
+  --idle-timeout-ms 1500 \
+  --max-bytes 8192 \
+  --json
+```
+
+Capture mode returns combined data plus `completion_reason`, `waited_ms`,
+`elapsed_ms`, and `chunks`. `write --read` accepts the same capture options.
 
 ## Macro Packs
 
