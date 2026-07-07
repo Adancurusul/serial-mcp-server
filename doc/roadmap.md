@@ -9,4 +9,5 @@
 - [x] Wire MCP `read`.
 - [x] Update user-facing docs and skill references.
 - [x] Run formatting and full tests.
+- [x] Run read-only hardware validation against a real serial device.
 - [x] Commit local branch and wait for user confirmation before PR.

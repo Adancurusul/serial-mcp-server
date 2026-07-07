@@ -54,10 +54,24 @@
     {
       "command": "cargo run --locked -- write --help",
       "status": "PASS"
+    },
+    {
+      "command": "target/debug/serial-mcp-server probe --port /dev/cu.usbmodem101 --baud 115200 --json",
+      "status": "PASS",
+      "summary": "opened=true on Espressif USB JTAG/serial debug unit"
+    },
+    {
+      "command": "target/debug/serial-mcp-server read --port /dev/cu.usbmodem101 --baud 115200 --format hex --timeout-ms 250 --duration-ms 3000 --start-trigger first-byte --initial-timeout-ms 5000 --idle-timeout-ms 1000 --max-bytes 4096 --json",
+      "status": "PASS",
+      "summary": "bytes_read=4096, waited_ms=120, elapsed_ms=644, completion_reason=max_bytes, chunks_len=86"
+    },
+    {
+      "command": "target/debug/serial-mcp-server read --port /dev/cu.usbmodem101 --baud 115200 --format hex --timeout-ms 250 --duration-ms 1200 --start-trigger first-byte --initial-timeout-ms 3000 --idle-timeout-ms 1000 --max-bytes 65536 --json",
+      "status": "PASS",
+      "summary": "bytes_read=7656, waited_ms=121, elapsed_ms=1202, completion_reason=duration_elapsed, chunks_len=137"
     }
   ],
-  "manual_verification": [
-    "No physical serial hardware round-trip was run."
+  "hardware_verification": [
+    "Read-only hardware validation passed on /dev/cu.usbmodem101 at 115200 baud. No write command was run and RTS/DTR were not changed."
   ]
 }
-

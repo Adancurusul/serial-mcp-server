@@ -51,3 +51,22 @@ Committed:
 Status:
 - Local branch implementation is complete.
 - Awaiting user review and explicit confirmation before opening a PR.
+
+## 2026-07-07T05:55:46Z
+
+Hardware validation:
+- Detected `/dev/cu.usbmodem101` as `Espressif USB JTAG/serial debug unit`
+  (`USB VID:303A PID:1001`).
+- `target/debug/serial-mcp-server probe --port /dev/cu.usbmodem101 --baud 115200 --json`
+  succeeded with `opened=true`.
+- Capture test 1:
+  `target/debug/serial-mcp-server read --port /dev/cu.usbmodem101 --baud 115200 --format hex --timeout-ms 250 --duration-ms 3000 --start-trigger first-byte --initial-timeout-ms 5000 --idle-timeout-ms 1000 --max-bytes 4096 --json`
+  returned `bytes_read=4096`, `waited_ms=120`, `elapsed_ms=644`,
+  `completion_reason=max_bytes`, and `chunks_len=86`.
+- Capture test 2:
+  `target/debug/serial-mcp-server read --port /dev/cu.usbmodem101 --baud 115200 --format hex --timeout-ms 250 --duration-ms 1200 --start-trigger first-byte --initial-timeout-ms 3000 --idle-timeout-ms 1000 --max-bytes 65536 --json`
+  returned `bytes_read=7656`, `waited_ms=121`, `elapsed_ms=1202`,
+  `completion_reason=duration_elapsed`, and `chunks_len=137`.
+- The decoded stream prefix contained sensor-style lines such as
+  `[T: 9964.026703125] AX: +0.01 AY: -0.02 AZ: -0.96 ...`.
+- No write command was run. RTS/DTR were not changed.
