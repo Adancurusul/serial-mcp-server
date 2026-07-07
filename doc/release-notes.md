@@ -55,9 +55,8 @@ response after the bounded capture window completes.
 
 Hardware validation covered real read-only streaming, including one capture that
 stopped by `max_bytes` and one capture that stopped by `duration_elapsed`. The
-validated hardware scope is read-only serial capture; write/read command
-protocols and RTS/DTR control-line behavior remain outside this validation
-round.
+validated hardware scope for this capture-window change is read-only serial
+capture.
 
 ## serial-mcp-server 0.2.0
 
