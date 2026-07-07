@@ -7,6 +7,7 @@
   },
   "current_phase": "task-done",
   "branch": "task/serial-capture-window",
+  "last_commit": "fc86023",
   "phases": {
     "init": {
       "status": "completed",
@@ -36,7 +37,8 @@
     "task-done": {
       "status": "pending",
       "verified": false,
-      "timestamp": "2026-07-07T04:16:02Z"
+      "timestamp": "2026-07-07T04:16:55Z",
+      "reason": "Local implementation is committed; PR intentionally deferred until user confirmation."
     }
   },
   "continue_remaining": 0,

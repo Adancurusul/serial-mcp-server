@@ -2,6 +2,7 @@
 
 Decision: PASS
 Timestamp: 2026-07-07T04:16:02Z
+Implementation commit: fc86023
 
 ## Scope Reviewed
 
@@ -24,4 +25,3 @@ Timestamp: 2026-07-07T04:16:02Z
 
 - Hardware behavior still needs manual validation against a real serial device.
 - No PR was opened per user instruction.
-

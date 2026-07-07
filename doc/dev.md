@@ -42,3 +42,12 @@ Notes:
 - No hardware round-trip was run; this change is verified through unit/API/help
   gates only.
 - No PR has been opened.
+
+## 2026-07-07T04:16:55Z
+
+Committed:
+- `fc86023` feat: add serial capture windows
+
+Status:
+- Local branch implementation is complete.
+- Awaiting user review and explicit confirmation before opening a PR.

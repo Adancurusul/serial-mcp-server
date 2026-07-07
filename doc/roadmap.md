@@ -9,4 +9,4 @@
 - [x] Wire MCP `read`.
 - [x] Update user-facing docs and skill references.
 - [x] Run formatting and full tests.
-- [ ] Commit local branch and wait for user confirmation before PR.
+- [x] Commit local branch and wait for user confirmation before PR.
