@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use clap::ValueEnum;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::io::{Error as IoError, ErrorKind};
 use std::time::Instant;
 
 use super::error::SerialError;
@@ -179,7 +180,13 @@ where
         let mut buffer = vec![0_u8; remaining_bytes];
 
         match reader.read_once(&mut buffer, timeout_ms).await {
-            Ok(0) | Err(SerialError::ReadTimeout) => {}
+            Ok(0) => {
+                return Err(SerialError::IoError(IoError::new(
+                    ErrorKind::UnexpectedEof,
+                    "serial stream returned zero bytes during capture",
+                )));
+            }
+            Err(SerialError::ReadTimeout) => {}
             Ok(bytes_read) => {
                 let now = Instant::now();
                 if capture_started.is_none() {
@@ -270,6 +277,10 @@ mod tests {
         chunks: VecDeque<Vec<u8>>,
     }
 
+    struct ZeroThenPanicReader {
+        calls: usize,
+    }
+
     impl ScriptedReader {
         fn new(chunks: Vec<&'static [u8]>) -> Self {
             Self {
@@ -298,6 +309,22 @@ mod tests {
             let bytes_read = chunk.len().min(buffer.len());
             buffer[..bytes_read].copy_from_slice(&chunk[..bytes_read]);
             Ok(bytes_read)
+        }
+    }
+
+    #[async_trait]
+    impl CaptureReader for ZeroThenPanicReader {
+        async fn read_once(
+            &mut self,
+            _buffer: &mut [u8],
+            _timeout_ms: u64,
+        ) -> Result<usize, SerialError> {
+            if self.calls == 0 {
+                self.calls += 1;
+                return Ok(0);
+            }
+
+            panic!("capture retried after a zero-byte read");
         }
     }
 
@@ -378,5 +405,18 @@ mod tests {
         assert_eq!(report.bytes_read(), 2);
         assert_eq!(report.completion_reason, CaptureCompletionReason::MaxBytes);
         assert_eq!(report.chunks[0].bytes_read, 2);
+    }
+
+    #[tokio::test]
+    async fn zero_byte_read_reports_unexpected_eof() {
+        let mut reader = ZeroThenPanicReader { calls: 0 };
+        let error = capture_with_reader(&mut reader, config())
+            .await
+            .unwrap_err();
+
+        match error {
+            SerialError::IoError(error) => assert_eq!(error.kind(), ErrorKind::UnexpectedEof),
+            other => panic!("expected UnexpectedEof, got {other:?}"),
+        }
     }
 }
