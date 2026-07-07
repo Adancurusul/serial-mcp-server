@@ -70,3 +70,23 @@ Hardware validation:
 - The decoded stream prefix contained sensor-style lines such as
   `[T: 9964.026703125] AX: +0.01 AY: -0.02 AZ: -0.96 ...`.
 - No write command was run. RTS/DTR were not changed.
+
+## 2026-07-07T06:04:17Z
+
+Review:
+- Inspected `main..HEAD` implementation and docs.
+- Confirmed `duration_ms` is the feature flag for capture mode and old
+  single-read behavior remains on the no-`duration_ms` path.
+- Confirmed CLI and MCP share the same `CaptureConfig` and `SerialConnection`
+  collector path in capture mode.
+- Found and fixed a documentation mismatch: `single_read` and
+  `single_read_timeout` are not emitted as `completion_reason`; single-read mode
+  intentionally keeps its old response shape.
+- Added release-note disclosure for AI/agent usage and explicit validation
+  boundaries.
+
+Verification:
+- `cargo fmt --check` passed.
+- `cargo clippy --locked --all-targets --all-features -- -D warnings` passed.
+- `cargo test --locked` passed.
+- `cargo doc --locked --all-features --no-deps` passed.

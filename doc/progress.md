@@ -13,6 +13,8 @@ Branch: `task/serial-capture-window`
 - Verification passed locally.
 - Read-only hardware validation passed on `/dev/cu.usbmodem101`
   (`Espressif USB JTAG/serial debug unit`) at 115200 baud.
+- Review pass completed: code remains reasonable, release notes now explicitly
+  disclose AI/agent usage semantics and hardware validation limits.
 - Implementation commit: `fc86023`.
 - User explicitly requested full local implementation and tests, with no PR
   until later confirmation.
@@ -30,3 +32,6 @@ Branch: `task/serial-capture-window`
   `max_bytes` after 4096 bytes, and one capture stopped at `duration_elapsed`
   after 7656 bytes over 1202 ms. No data was written and RTS/DTR were not
   changed.
+- 2026-07-07T06:04:17Z: Reviewed implementation and docs. Re-ran format,
+  clippy, tests, and docs. Corrected design-doc completion reason wording and
+  added AI/agent usage disclosure to release notes.

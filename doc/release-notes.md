@@ -25,6 +25,39 @@ existing single-read behavior when `duration_ms` is absent.
 - Existing reads without `duration_ms` continue to perform one serial read.
 - `timeout_ms` remains a per-read wait timeout, not a total capture duration.
 
+### AI / Agent Usage Disclosure
+
+This is explicitly an AI/agent-facing feature. It is safe to describe it as a
+bounded serial capture API for agents that need to choose how long to collect
+data in one CLI or MCP call.
+
+The precise behavior to disclose is:
+
+- `duration_ms` controls how long data is collected after capture starts.
+- The default `first_byte` trigger waits for output before starting the capture
+  clock.
+- `initial_timeout_ms` controls how long the caller is willing to wait for that
+  first byte.
+- `idle_timeout_ms` and `max_bytes` keep capture bounded.
+- The response reports why collection stopped through `completion_reason`.
+
+Do not describe this as streaming, background recording, or unbounded logging.
+The implementation returns one combined response after the bounded capture
+window completes.
+
+### Validation
+
+- `cargo fmt --check`: PASS
+- `cargo clippy --locked --all-targets --all-features -- -D warnings`: PASS
+- `cargo test --locked`: PASS
+- `cargo doc --locked --all-features --no-deps`: PASS
+- Read-only hardware validation on `/dev/cu.usbmodem101`
+  (`Espressif USB JTAG/serial debug unit`) at 115200 baud: PASS
+
+Hardware validation covered real read-only streaming, including one capture that
+stopped by `max_bytes` and one capture that stopped by `duration_elapsed`. No
+write command was run, and RTS/DTR behavior was not tested.
+
 ## serial-mcp-server 0.2.0
 
 Status: released.

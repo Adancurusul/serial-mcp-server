@@ -48,14 +48,15 @@ Capture mode also reports:
 - `chunks`: byte offset, byte count, waited time, and capture elapsed time for
   each received chunk.
 
-## Completion Reasons
+## Capture Completion Reasons
 
-- `single_read`
-- `single_read_timeout`
 - `duration_elapsed`
 - `initial_timeout`
 - `idle_timeout`
 - `max_bytes`
+
+Single-read mode intentionally keeps the existing response shape. When
+`duration_ms` is absent, `completion_reason` is not emitted.
 
 ## Implementation Notes
 
@@ -76,4 +77,3 @@ Capture mode also reports:
 - CLI and MCP share response semantics.
 - `cargo fmt --check` passes.
 - `cargo test --locked` passes.
-

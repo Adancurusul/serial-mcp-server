@@ -27,6 +27,11 @@ Implementation commit: fc86023
 - Hardware capture with `duration-ms=1200`, `start-trigger=first-byte`,
   `max-bytes=65536`: PASS, stopped by `duration_elapsed` after 7656 bytes,
   1202 ms, and 137 chunks.
+- Review pass: PASS. Design docs now match the implementation: single-read mode
+  does not emit `completion_reason`, while capture mode emits
+  `duration_elapsed`, `initial_timeout`, `idle_timeout`, or `max_bytes`.
+- AI/agent usage disclosure: PASS. Release notes describe the feature as a
+  bounded agent-facing capture API and state the validation limits.
 
 ## Residual Risk
 
